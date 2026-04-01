@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>睡眠日誌</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --border: #e8e5e0;
+    --border-strong: #ccc9c2;
+    --text: #1a1917;
+    --muted: #6b6860;
+    --hint: #a8a59f;
+    --accent: #1a1917;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 0 3rem;
+  }
+
+  .header {
+    padding: 2rem 1.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .container { max-width: 520px; margin: 0 auto; padding: 0 1.25rem; }
+
+  .section { margin-bottom: 2rem; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--hint);
+    margin-bottom: 10px;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field input[type="date"],
+  .field input[type="time"] {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .field input:focus { outline: none; border-color: var(--border-strong); }
+
+  .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-opt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.12s;
+    background: var(--surface);
+    user-select: none;
+  }
+  .radio-opt:hover { border-color: var(--border-strong); }
+  .radio-opt.sel { border-color: var(--text); background: var(--surface); }
+  .radio-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+  }
+  .radio-opt.sel .radio-dot {
+    border-color: var(--text);
+    background: var(--text);
+  }
+  .radio-opt.sel .radio-dot::after {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .radio-opt span { font-size: 14px; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .toggle-text { font-size: 14px; }
+  .toggle-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .switch {
+    width: 44px; height: 24px;
+    border-radius: 12px;
+    background: var(--border-strong);
+    border: none; cursor: pointer;
+    position: relative;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .switch.on { background: var(--text); }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .switch.on::after { transform: translateX(20px); }
+
+  .stars-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .star-btn {
+    width: 40px; height: 40px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s;
+    color: var(--border-strong);
+    line-height: 1;
+  }
+  .star-btn.lit { border-color: var(--border-strong); color: #c8a84b; }
+  .quality-hint { display: flex; justify-content: space-between; font-size: 11px; color: var(--hint); }
+
+  .submit {
+    width: 100%;
+    padding: 13px;
+    background: var(--text);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    margin-top: 0.5rem;
+  }
+  .submit:hover { opacity: 0.85; }
+  .submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .success {
+    display: none;
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+  .success-check {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: #f0f7f0;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 24px;
+  }
+  .success h2 { font-size: 18px; margin-bottom: 6px; }
+  .success p { font-size: 14px; color: var(--muted); margin-bottom: 1.5rem; }
+  .success button {
+    padding: 9px 20px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: transparent;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .config-notice {
+    background: #fff8e8;
+    border: 1px solid #f0d070;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #7a5c00;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+  .config-notice strong { display: block; margin-bottom: 4px; }
+
+  .error-msg {
+    background: #fff0f0;
+    border: 1px solid #f5c0c0;
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #a03030;
+    margin-top: 10px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="container">
+    <h1>睡眠日誌</h1>
+    <p>記錄你的每日睡眠狀況</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ⚠️ 設定提示（部署後請移除） -->
+  <div class="config-notice" id="config-notice">
+    <strong>⚙️ 部署設定提醒</strong>
+    請將下方 JavaScript 中的 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 替換為你的 Supabase 專案資訊，然後移除此提示區塊。
+  </div>
+
+  <div id="form-area">
+    <div class="section">
+      <div class="section-label">日期</div>
+      <div class="field">
+        <input type="date" id="f-date">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">時間記錄</div>
+      <div class="time-grid">
+        <div class="field"><label>躺床時間</label><input type="time" id="f-bed"></div>
+        <div class="field"><label>入睡時間</label><input type="time" id="f-sleep"></div>
+        <div class="field"><label>醒來時間</label><input type="time" id="f-wake"></div>
+        <div class="field"><label>起床時間</label><input type="time" id="f-up"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">中間醒來情形</div>
+      <div class="radio-group" id="wakeup-group">
+        <div class="radio-opt sel" data-val="none" onclick="pick(this,'wakeup-group')">
+          <div class="radio-dot"></div><span>沒有醒來</span>
+        </div>
+        <div class="radio-opt" data-val="1-2" onclick="pick(this,'wakeup-group')">
+          <div class="radio-dot"></div><span>醒來 1–2 次</span>
+        </div>
+        <div class="radio-opt" data-val="3+" onclick="pick(this,'wakeup-group')">
+          <div class="radio-dot"></div><span>醒來 3 次以上</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">醒來後是否難以再入睡</div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-text" id="insomnia-text">否</div>
+          <div class="toggle-sub" id="insomnia-sub">醒來後可順利再入睡</div>
+        </div>
+        <button class="switch" id="insomnia-sw" onclick="toggleInsomnia()"></button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">入睡品質自評</div>
+      <div class="stars-row" id="stars">
+        <button class="star-btn" onclick="rate(1)">★</button>
+        <button class="star-btn" onclick="rate(2)">★</button>
+        <button class="star-btn" onclick="rate(3)">★</button>
+        <button class="star-btn" onclick="rate(4)">★</button>
+        <button class="star-btn" onclick="rate(5)">★</button>
+      </div>
+      <div class="quality-hint">
+        <span>非常差</span><span>普通</span><span>非常好</span>
+      </div>
+    </div>
+
+    <button class="submit" id="submit-btn" onclick="submitLog()">儲存日誌</button>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div class="success" id="success-area">
+    <div class="success-check">✓</div>
+    <h2>日誌已儲存</h2>
+    <p>你的睡眠記錄已成功寫入</p>
+    <button onclick="resetForm()">繼續填寫</button>
+  </div>
+</div>
+
+<script>
+  // ====================================================
+  // 🔧 Supabase 專案資訊
+  const SUPABASE_URL = 'https://wxdyrowwzdptktdravpb.supabase.co'
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZHlyb3d3emRwdGt0ZHJhdnBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQwMzgsImV4cCI6MjA5MDU1MDAzOH0.G_v_X_aU8QCu5baa3PqktYAMniVzMIcDqpBuZEO_uFQ'
+  // ====================================================
+
+  const { createClient } = supabase
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+  let rating = 0
+  let insomnia = false
+  let wakeup = 'none'
+
+  // 預設今天
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10)
+
+  function pick(el, groupId) {
+    document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o => o.classList.remove('sel'))
+    el.classList.add('sel')
+    wakeup = el.dataset.val
+  }
+
+  function toggleInsomnia() {
+    insomnia = !insomnia
+    const sw = document.getElementById('insomnia-sw')
+    sw.classList.toggle('on', insomnia)
+    document.getElementById('insomnia-text').textContent = insomnia ? '是' : '否'
+    document.getElementById('insomnia-sub').textContent = insomnia ? '醒來後難以再入睡' : '醒來後可順利再入睡'
+  }
+
+  function rate(n) {
+    rating = n
+    document.querySelectorAll('#stars .star-btn').forEach((s,i) => s.classList.toggle('lit', i < n))
+  }
+
+  async function submitLog() {
+    const date = document.getElementById('f-date').value
+    const bed = document.getElementById('f-bed').value
+    const sleep = document.getElementById('f-sleep').value
+    const wake = document.getElementById('f-wake').value
+    const up = document.getElementById('f-up').value
+    const errEl = document.getElementById('error-msg')
+
+    if (!date || !bed || !sleep || !wake || !up) {
+      showError('請填寫完整的日期與時間欄位')
+      return
+    }
+    if (rating === 0) {
+      showError('請選擇入睡品質（1–5 顆星）')
+      return
+    }
+
+    const btn = document.getElementById('submit-btn')
+    btn.disabled = true
+    btn.textContent = '儲存中...'
+    errEl.style.display = 'none'
+
+    const { error } = await db.from('sleep_logs').insert({
+      date,
+      bed_time: bed,
+      sleep_time: sleep,
+      wake_time: wake,
+      up_time: up,
+      wakeup_count: wakeup,
+      insomnia,
+      quality: rating
+    })
+
+    if (error) {
+      showError('儲存失敗：' + error.message)
+      btn.disabled = false
+      btn.textContent = '儲存日誌'
+      return
+    }
+
+    document.getElementById('form-area').style.display = 'none'
+    document.getElementById('success-area').style.display = 'block'
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg')
+    el.textContent = msg
+    el.style.display = 'block'
+  }
+
+  function resetForm() {
+    document.getElementById('form-area').style.display = 'block'
+    document.getElementById('success-area').style.display = 'none'
+    document.getElementById('f-date').value = new Date().toISOString().slice(0,10)
+    document.getElementById('f-bed').value = ''
+    document.getElementById('f-sleep').value = ''
+    document.getElementById('f-wake').value = ''
+    document.getElementById('f-up').value = ''
+    rating = 0
+    insomnia = false
+    wakeup = 'none'
+    document.querySelectorAll('#stars .star-btn').forEach(s => s.classList.remove('lit'))
+    document.querySelectorAll('#wakeup-group .radio-opt').forEach((o,i) => o.classList.toggle('sel', i===0))
+    document.getElementById('insomnia-sw').classList.remove('on')
+    document.getElementById('insomnia-text').textContent = '否'
+    document.getElementById('insomnia-sub').textContent = '醒來後可順利再入睡'
+    document.getElementById('submit-btn').disabled = false
+    document.getElementById('submit-btn').textContent = '儲存日誌'
+    document.getElementById('error-msg').style.display = 'none'
+  }
+</script>
+</body>
+</html>
