@@ -1,241 +1,121 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<head><link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>熊愛睏睡眠日誌</title>
+<title>睡眠日誌</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg:          #f0ece6;
-    --surface:     #faf8f5;
-    --border:      #ddd8d0;
-    --border-sel:  #8c7b6e;
-    --text:        #4a3f35;
-    --muted:       #7a6e65;
-    --hint:        #a89e96;
-    --accent:      #8c7b6e;
-    --accent-deep: #6b5a50;
-    --sel-bg:      #f0ebe5;
-    --radius:      14px;
-    --radius-lg:   18px;
+    --bg: #f0ece6; --surface: #faf8f5;
+    --border: #ddd8d0; --border-sel: #8c7b6e;
+    --text: #4a3f35; --muted: #7a6e65; --hint: #a89e96;
+    --accent: #8c7b6e; --accent-deep: #6b5a50; --sel-bg: #f0ebe5;
+    --radius: 14px; --radius-lg: 18px;
   }
+  body { font-family: 'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0 0 4rem; }
 
-  body {
-    font-family: 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 0 0 4rem;
-  }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.5rem 1.5rem 1.25rem; margin-bottom: 0; text-align: center; }
+  .header-bear { font-size: 54px; line-height: 1; margin-bottom: 8px; }
+  .header h1 { font-size: 18px; font-weight: 700; }
+  .header p { font-size: 13px; color: var(--muted); margin-top: 3px; }
 
-  .header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 1.75rem 1.5rem 1.5rem;
-    margin-bottom: 1.75rem;
-    text-align: center;
-  }
-  .header-bear { font-size: 60px; line-height: 1; margin-bottom: 10px; }
-  .header h1 { font-size: 19px; font-weight: 700; color: var(--text); }
-  .header p { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  /* Tab nav */
+  .tab-nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); margin-bottom: 1.75rem; }
+  .tab-btn { flex: 1; padding: 13px 0; font-size: 14px; font-weight: 600; font-family: inherit; border: none; background: transparent; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab-btn.active { color: var(--accent-deep); border-bottom-color: var(--accent-deep); }
+
+  .tab-page { display: none; }
+  .tab-page.active { display: block; }
 
   .container { max-width: 480px; margin: 0 auto; padding: 0 1.25rem; }
 
   .section { margin-bottom: 1.75rem; }
-  .section-label {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--muted);
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .section-label::before {
-    content: '';
-    display: inline-block;
-    width: 4px; height: 17px;
-    background: var(--accent);
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
+  .section-label { font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .section-label::before { content:''; display:inline-block; width:4px; height:17px; background:var(--accent); border-radius:2px; flex-shrink:0; }
 
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
-  .field input[type="text"],
-  .field input[type="date"],
-  .field input[type="time"] {
-    width: 100%;
-    padding: 13px 16px;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    font-size: 16px;
-    font-family: inherit;
-    background: var(--surface);
-    color: var(--text);
-    transition: border-color 0.15s;
-    -webkit-appearance: none;
+  .field input[type="text"], .field input[type="date"], .field input[type="time"] {
+    width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius);
+    font-size: 16px; font-family: inherit; background: var(--surface); color: var(--text);
+    transition: border-color 0.15s; -webkit-appearance: none;
   }
   .field input:focus { outline: none; border-color: var(--border-sel); }
   .field input::placeholder { color: var(--hint); }
 
   .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+  /* 小睡區塊 */
+  .nap-item { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+  .nap-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .nap-item-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .nap-remove { background: transparent; border: none; font-size: 18px; color: var(--hint); cursor: pointer; padding: 0 4px; line-height: 1; }
+  .nap-remove:hover { color: #a03030; }
+  .add-nap-btn { width: 100%; padding: 11px; border: 2px dashed var(--border); border-radius: var(--radius); background: transparent; font-size: 14px; color: var(--muted); font-family: inherit; cursor: pointer; transition: all 0.15s; }
+  .add-nap-btn:hover { border-color: var(--accent); color: var(--accent-deep); background: var(--sel-bg); }
+
   .radio-group { display: flex; flex-direction: column; gap: 10px; }
-  .radio-opt {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    background: var(--surface);
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .radio-opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; background: var(--surface); user-select: none; -webkit-tap-highlight-color: transparent; }
   .radio-opt:active { transform: scale(0.98); }
   .radio-opt.sel { border-color: var(--border-sel); background: var(--sel-bg); }
-  .radio-dot {
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
-    background: var(--surface);
-  }
+  .radio-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; background: var(--surface); }
   .radio-opt.sel .radio-dot { border-color: var(--accent-deep); background: var(--accent-deep); }
   .radio-opt.sel .radio-dot::after { content:''; width:8px; height:8px; border-radius:50%; background:#fff; }
-  .radio-opt span { font-size: 15px; color: var(--text); }
+  .radio-opt span { font-size: 15px; }
 
   #wake-dur-section { display: none; }
 
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    gap: 12px;
-  }
-  .toggle-text { font-size: 15px; color: var(--text); font-weight: 600; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); gap: 12px; }
+  .toggle-text { font-size: 15px; font-weight: 600; }
   .toggle-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
-  .switch {
-    width: 52px; height: 30px;
-    border-radius: 15px;
-    background: var(--border);
-    border: none; cursor: pointer;
-    position: relative;
-    transition: background 0.2s;
-    flex-shrink: 0;
-  }
+  .switch { width: 52px; height: 30px; border-radius: 15px; background: var(--border); border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; }
   .switch.on { background: var(--accent-deep); }
-  .switch::after {
-    content: '';
-    position: absolute;
-    top: 4px; left: 4px;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform 0.2s;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  }
+  .switch::after { content:''; position:absolute; top:4px; left:4px; width:22px; height:22px; border-radius:50%; background:#fff; transition:transform 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.25); }
   .switch.on::after { transform: translateX(22px); }
 
-  /* 魚評分 */
-  .fish-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-    align-items: center;
-  }
-  .fish-btn {
-    width: 52px; height: 52px;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    cursor: pointer;
-    font-size: 26px;
-    display: flex; align-items: center; justify-content: center;
-    transition: border-color 0.15s, background 0.15s, transform 0.1s;
-    line-height: 1;
-    padding: 0;
-    -webkit-tap-highlight-color: transparent;
-    flex-shrink: 0;
-  }
+  .fish-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .fish-btn { width: 52px; height: 52px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; font-size: 26px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; padding: 0; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
   .fish-btn:active { transform: scale(0.9); }
   .fish-btn.lit { border-color: var(--border-sel); background: var(--sel-bg); }
-  .fish-label {
-    font-size: 13px;
-    color: var(--hint);
-    flex: 1;
-    padding-left: 4px;
-  }
-  .quality-hint {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: var(--hint);
-    padding: 0 4px;
-  }
+  .fish-label { font-size: 13px; color: var(--hint); flex: 1; padding-left: 4px; }
+  .quality-hint { display: flex; justify-content: space-between; font-size: 12px; color: var(--hint); padding: 0 4px; }
 
-  .submit {
-    width: 100%;
-    padding: 16px;
-    background: var(--accent-deep);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius);
-    font-size: 16px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    margin-top: 0.5rem;
-    letter-spacing: 0.5px;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .submit { width: 100%; padding: 16px; background: var(--accent-deep); color: #fff; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; margin-top: 0.5rem; }
   .submit:active { opacity: 0.8; }
   .submit:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .success {
-    display: none;
-    text-align: center;
-    padding: 4rem 1rem;
-  }
+  .success { display: none; text-align: center; padding: 4rem 1rem; }
   .success-bear { font-size: 64px; margin-bottom: 14px; }
   .success h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
   .success p { font-size: 14px; color: var(--muted); margin-bottom: 2rem; line-height: 1.7; }
-  .success button {
-    padding: 13px 30px;
-    border: 2px solid var(--border-sel);
-    border-radius: var(--radius);
-    background: transparent;
-    font-size: 15px;
-    font-family: inherit;
-    cursor: pointer;
-    color: var(--text);
-    font-weight: 600;
-  }
+  .success button { padding: 13px 30px; border: 2px solid var(--border-sel); border-radius: var(--radius); background: transparent; font-size: 15px; font-family: inherit; cursor: pointer; color: var(--text); font-weight: 600; }
 
-  .error-msg {
-    background: #f5e8e8;
-    border: 1px solid #d4a0a0;
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    font-size: 14px;
-    color: #8a3030;
-    margin-top: 12px;
-    display: none;
-    line-height: 1.5;
-  }
+  .error-msg { background: #f5e8e8; border: 1px solid #d4a0a0; border-radius: var(--radius); padding: 12px 16px; font-size: 14px; color: #8a3030; margin-top: 12px; display: none; line-height: 1.5; }
+
+  /* 查詢頁 */
+  .lookup-box { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; }
+  .lookup-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .lookup-input-row { display: flex; gap: 8px; }
+  .lookup-input-row input { flex: 1; padding: 11px 14px; border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: inherit; background: var(--bg); color: var(--text); }
+  .lookup-input-row input:focus { outline: none; border-color: var(--border-sel); }
+  .lookup-btn { padding: 11px 18px; background: var(--accent-deep); color: #fff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  .lookup-hint { font-size: 12px; color: var(--hint); margin-top: 8px; line-height: 1.5; }
+
+  .my-records { display: flex; flex-direction: column; gap: 12px; }
+  .my-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .my-card-date { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+  .my-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .my-card-item .ci-label { font-size: 11px; color: var(--hint); margin-bottom: 2px; }
+  .my-card-item .ci-val { font-size: 14px; font-weight: 600; color: var(--text); }
+  .my-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .my-tag { font-size: 12px; padding: 3px 10px; border-radius: 20px; background: var(--sel-bg); color: var(--muted); border: 1px solid var(--border); }
+  .my-tag.warn { background: #fff3e0; color: #a06000; border-color: #f0c060; }
+
+  .lookup-empty { text-align: center; padding: 2.5rem 1rem; color: var(--hint); font-size: 14px; }
+  .lookup-loading { text-align: center; padding: 1.5rem; color: var(--hint); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -243,107 +123,114 @@
 <div class="header">
   <div class="header-bear">🐻</div>
   <h1>每日睡眠日誌</h1>
-  <p>記錄你的睡眠，讓熊愛睏一起照顧你的睡眠</p>
+  <p>記錄你的睡眠，讓熊愛睏一起照顧你</p>
 </div>
 
-<div class="container">
-  <div id="form-area">
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('form',this)">✏️ 填寫日誌</button>
+  <button class="tab-btn" onclick="switchTab('lookup',this)">📋 查看記錄</button>
+</div>
 
-    <div class="section">
-      <div class="section-label">你是誰</div>
-      <div class="field">
-        <input type="text" id="f-name" placeholder="請輸入你的名字">
+<!-- 填寫頁 -->
+<div class="tab-page active" id="tab-form">
+  <div class="container">
+    <div id="form-area">
+
+      <div class="section">
+        <div class="section-label">你是誰</div>
+        <div class="field"><input type="text" id="f-name" placeholder="請輸入你的名字"></div>
       </div>
+
+      <div class="section">
+        <div class="section-label">填寫日期</div>
+        <div class="field"><input type="date" id="f-date"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">昨晚的時間記錄</div>
+        <div class="time-grid">
+          <div class="field"><label>躺床時間</label><input type="time" id="f-bed"></div>
+          <div class="field"><label>入睡時間</label><input type="time" id="f-sleep"></div>
+          <div class="field"><label>醒來時間</label><input type="time" id="f-wake"></div>
+          <div class="field"><label>起床時間</label><input type="time" id="f-up"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">昨天的小睡記錄</div>
+        <div id="nap-list"></div>
+        <button class="add-nap-btn" onclick="addNap()">＋ 新增一段小睡</button>
+      </div>
+
+      <div class="section">
+        <div class="section-label">中間有沒有醒來</div>
+        <div class="radio-group" id="wakeup-group">
+          <div class="radio-opt sel" data-val="none" onclick="pickWakeup(this)"><div class="radio-dot"></div><span>沒有醒來</span></div>
+          <div class="radio-opt" data-val="1-2" onclick="pickWakeup(this)"><div class="radio-dot"></div><span>醒來 1–2 次</span></div>
+          <div class="radio-opt" data-val="3+" onclick="pickWakeup(this)"><div class="radio-dot"></div><span>醒來 3 次以上</span></div>
+        </div>
+      </div>
+
+      <div class="section" id="wake-dur-section">
+        <div class="section-label">大約醒了多久</div>
+        <div class="radio-group" id="dur-group">
+          <div class="radio-opt" data-val="lt5" onclick="pick(this,'dur-group')"><div class="radio-dot"></div><span>5 分鐘以內</span></div>
+          <div class="radio-opt" data-val="5-10" onclick="pick(this,'dur-group')"><div class="radio-dot"></div><span>5–10 分鐘</span></div>
+          <div class="radio-opt" data-val="10-15" onclick="pick(this,'dur-group')"><div class="radio-dot"></div><span>10–15 分鐘</span></div>
+          <div class="radio-opt" data-val="15-20" onclick="pick(this,'dur-group')"><div class="radio-dot"></div><span>15–20 分鐘</span></div>
+          <div class="radio-opt" data-val="20+" onclick="pick(this,'dur-group')"><div class="radio-dot"></div><span>20 分鐘或更久</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">醒來後是否難以再入睡</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-text" id="insomnia-text">否</div>
+            <div class="toggle-sub" id="insomnia-sub">醒來後可以順利再睡著</div>
+          </div>
+          <button class="switch" id="insomnia-sw" onclick="toggleInsomnia()"></button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">我覺得我昨天睡得…</div>
+        <div class="fish-row" id="stars">
+          <button class="fish-btn" onclick="rate(1)">🐟</button>
+          <button class="fish-btn" onclick="rate(2)">🐟</button>
+          <button class="fish-btn" onclick="rate(3)">🐟</button>
+          <button class="fish-btn" onclick="rate(4)">🐟</button>
+          <button class="fish-btn" onclick="rate(5)">🐟</button>
+          <span class="fish-label" id="fish-label">尚未選擇</span>
+        </div>
+        <div class="quality-hint"><span>非常差</span><span>普通</span><span>非常好</span></div>
+      </div>
+
+      <button class="submit" id="submit-btn" onclick="submitLog()">儲存日誌</button>
+      <div class="error-msg" id="error-msg"></div>
     </div>
 
-    <div class="section">
-      <div class="section-label">填寫日期</div>
-      <div class="field">
-        <input type="date" id="f-date">
-      </div>
+    <div class="success" id="success-area">
+      <div class="success-bear">🐻</div>
+      <h2>謝謝你的記錄！</h2>
+      <p>熊愛睏幫你把今天的睡眠日誌<br>安全地存起來了 🐟</p>
+      <button onclick="resetForm()">繼續填寫</button>
     </div>
-
-    <div class="section">
-      <div class="section-label">昨晚的時間記錄</div>
-      <div class="time-grid">
-        <div class="field"><label>躺床時間</label><input type="time" id="f-bed"></div>
-        <div class="field"><label>入睡時間</label><input type="time" id="f-sleep"></div>
-        <div class="field"><label>醒來時間</label><input type="time" id="f-wake"></div>
-        <div class="field"><label>起床時間</label><input type="time" id="f-up"></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">中間有沒有醒來</div>
-      <div class="radio-group" id="wakeup-group">
-        <div class="radio-opt sel" data-val="none" onclick="pickWakeup(this)">
-          <div class="radio-dot"></div><span>沒有醒來</span>
-        </div>
-        <div class="radio-opt" data-val="1-2" onclick="pickWakeup(this)">
-          <div class="radio-dot"></div><span>醒來 1–2 次</span>
-        </div>
-        <div class="radio-opt" data-val="3+" onclick="pickWakeup(this)">
-          <div class="radio-dot"></div><span>醒來 3 次以上</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="section" id="wake-dur-section">
-      <div class="section-label">大約醒了多久</div>
-      <div class="radio-group" id="dur-group">
-        <div class="radio-opt" data-val="lt5" onclick="pick(this,'dur-group')">
-          <div class="radio-dot"></div><span>5 分鐘以內</span>
-        </div>
-        <div class="radio-opt" data-val="5-10" onclick="pick(this,'dur-group')">
-          <div class="radio-dot"></div><span>5–10 分鐘</span>
-        </div>
-        <div class="radio-opt" data-val="10-15" onclick="pick(this,'dur-group')">
-          <div class="radio-dot"></div><span>10–15 分鐘</span>
-        </div>
-        <div class="radio-opt" data-val="15-20" onclick="pick(this,'dur-group')">
-          <div class="radio-dot"></div><span>15–20 分鐘</span>
-        </div>
-        <div class="radio-opt" data-val="20+" onclick="pick(this,'dur-group')">
-          <div class="radio-dot"></div><span>20 分鐘或更久</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">醒來後是否難以再入睡</div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-text" id="insomnia-text">否</div>
-          <div class="toggle-sub" id="insomnia-sub">醒來後可以順利再睡著</div>
-        </div>
-        <button class="switch" id="insomnia-sw" onclick="toggleInsomnia()"></button>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">我覺得我昨天睡得…</div>
-      <div class="fish-row" id="stars">
-        <button class="fish-btn" onclick="rate(1)">🐟</button>
-        <button class="fish-btn" onclick="rate(2)">🐟</button>
-        <button class="fish-btn" onclick="rate(3)">🐟</button>
-        <button class="fish-btn" onclick="rate(4)">🐟</button>
-        <button class="fish-btn" onclick="rate(5)">🐟</button>
-        <span class="fish-label" id="fish-label">尚未選擇</span>
-      </div>
-      <div class="quality-hint">
-        <span>非常差</span><span>普通</span><span>非常好</span>
-      </div>
-    </div>
-
-    <button class="submit" id="submit-btn" onclick="submitLog()">儲存日誌</button>
-    <div class="error-msg" id="error-msg"></div>
   </div>
+</div>
 
-  <div class="success" id="success-area">
-    <div class="success-bear">🐻</div>
-    <h2>謝謝你的記錄！</h2>
-    <p>小熊幫你把今天的睡眠日誌<br>安全地存起來了 🐟</p>
-    <button onclick="resetForm()">繼續填寫</button>
+<!-- 查詢頁 -->
+<div class="tab-page" id="tab-lookup">
+  <div class="container">
+    <div class="lookup-box">
+      <h3>🔍 查看我的記錄</h3>
+      <div class="lookup-input-row">
+        <input type="text" id="lookup-name" placeholder="輸入你的名字">
+        <button class="lookup-btn" onclick="lookupRecords()">查詢</button>
+      </div>
+      <div class="lookup-hint">輸入你每次紀錄的那個名字哦！</div>
+    </div>
+    <div id="lookup-result"></div>
   </div>
 </div>
 
@@ -357,25 +244,62 @@
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  let rating = 0
-  let insomnia = false
-  let wakeup = 'none'
-  let wakeDur = ''
-
+  let rating = 0, insomnia = false, wakeup = 'none', wakeDur = ''
+  let napCount = 0
   const fishLabels = ['','很差，完全沒睡好','不太好，有點累','還可以，普普通通','不錯，有休息到','很好，睡得很舒服']
 
   document.getElementById('f-date').value = new Date().toISOString().slice(0,10)
 
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'))
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.getElementById('tab-'+name).classList.add('active')
+    btn.classList.add('active')
+  }
+
+  // ── 小睡 ──
+  function addNap() {
+    napCount++
+    const id = napCount
+    const div = document.createElement('div')
+    div.className = 'nap-item'
+    div.id = 'nap-' + id
+    div.innerHTML = `
+      <div class="nap-item-head">
+        <span class="nap-item-title">第 ${id} 段小睡</span>
+        <button class="nap-remove" onclick="removeNap(${id})">✕</button>
+      </div>
+      <div class="time-grid">
+        <div class="field"><label>開始時間</label><input type="time" id="nap-start-${id}"></div>
+        <div class="field"><label>結束時間</label><input type="time" id="nap-end-${id}"></div>
+      </div>`
+    document.getElementById('nap-list').appendChild(div)
+  }
+
+  function removeNap(id) {
+    const el = document.getElementById('nap-' + id)
+    if (el) el.remove()
+  }
+
+  function getNaps() {
+    const naps = []
+    document.querySelectorAll('.nap-item').forEach(item => {
+      const id = item.id.replace('nap-','')
+      const s = document.getElementById('nap-start-'+id)?.value
+      const e = document.getElementById('nap-end-'+id)?.value
+      if (s && e) naps.push({ start: s, end: e })
+    })
+    return naps
+  }
+
+  // ── 表單互動 ──
   function pickWakeup(el) {
     document.querySelectorAll('#wakeup-group .radio-opt').forEach(o => o.classList.remove('sel'))
     el.classList.add('sel')
     wakeup = el.dataset.val
     const hasWake = wakeup !== 'none'
     document.getElementById('wake-dur-section').style.display = hasWake ? 'block' : 'none'
-    if (!hasWake) {
-      document.querySelectorAll('#dur-group .radio-opt').forEach(o => o.classList.remove('sel'))
-      wakeDur = ''
-    }
+    if (!hasWake) { document.querySelectorAll('#dur-group .radio-opt').forEach(o => o.classList.remove('sel')); wakeDur = '' }
   }
 
   function pick(el, groupId) {
@@ -397,6 +321,7 @@
     document.getElementById('fish-label').textContent = fishLabels[n]
   }
 
+  // ── 儲存 ──
   async function submitLog() {
     const name  = document.getElementById('f-name').value.trim()
     const date  = document.getElementById('f-date').value
@@ -404,47 +329,34 @@
     const sleep = document.getElementById('f-sleep').value
     const wake  = document.getElementById('f-wake').value
     const up    = document.getElementById('f-up').value
-    const errEl = document.getElementById('error-msg')
+    const naps  = getNaps()
 
-    if (!name)                             { showError('請填寫你的名字 🐻'); return }
-    if (!date || !bed || !sleep || !wake || !up) { showError('請填寫完整的日期與時間欄位'); return }
-    if (wakeup !== 'none' && !wakeDur)     { showError('請選擇大約醒來了多久'); return }
-    if (rating === 0)                      { showError('請為昨天的睡眠評分 🐟'); return }
+    if (!name)                              { showError('請填寫你的名字 🐻'); return }
+    if (!date||!bed||!sleep||!wake||!up)    { showError('請填寫完整的日期與時間欄位'); return }
+    if (wakeup !== 'none' && !wakeDur)      { showError('請選擇大約醒來了多久'); return }
+    if (rating === 0)                       { showError('請為昨天的睡眠評分 🐟'); return }
 
     const btn = document.getElementById('submit-btn')
-    btn.disabled = true
-    btn.textContent = '儲存中...'
-    errEl.style.display = 'none'
+    btn.disabled = true; btn.textContent = '儲存中...'
+    document.getElementById('error-msg').style.display = 'none'
 
     const { error } = await db.from('sleep_logs').insert({
-      name,
-      date,
-      bed_time: bed,
-      sleep_time: sleep,
-      wake_time: wake,
-      up_time: up,
-      wakeup_count: wakeup,
-      wake_duration: wakeDur || null,
-      insomnia,
-      quality: rating
+      name, date,
+      bed_time: bed, sleep_time: sleep, wake_time: wake, up_time: up,
+      wakeup_count: wakeup, wake_duration: wakeDur || null,
+      insomnia, quality: rating,
+      naps: naps.length > 0 ? JSON.stringify(naps) : null
     })
 
-    if (error) {
-      showError('儲存失敗：' + error.message)
-      btn.disabled = false
-      btn.textContent = '儲存日誌'
-      return
-    }
-
+    if (error) { showError('儲存失敗：' + error.message); btn.disabled = false; btn.textContent = '儲存日誌'; return }
     document.getElementById('form-area').style.display = 'none'
     document.getElementById('success-area').style.display = 'block'
   }
 
   function showError(msg) {
     const el = document.getElementById('error-msg')
-    el.textContent = msg
-    el.style.display = 'block'
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.textContent = msg; el.style.display = 'block'
+    el.scrollIntoView({ behavior:'smooth', block:'nearest' })
   }
 
   function resetForm() {
@@ -456,6 +368,8 @@
     document.getElementById('f-sleep').value = ''
     document.getElementById('f-wake').value = ''
     document.getElementById('f-up').value = ''
+    document.getElementById('nap-list').innerHTML = ''
+    napCount = 0
     rating = 0; insomnia = false; wakeup = 'none'; wakeDur = ''
     document.querySelectorAll('#stars .fish-btn').forEach(s => s.classList.remove('lit'))
     document.getElementById('fish-label').textContent = '尚未選擇'
@@ -468,6 +382,66 @@
     document.getElementById('submit-btn').disabled = false
     document.getElementById('submit-btn').textContent = '儲存日誌'
     document.getElementById('error-msg').style.display = 'none'
+  }
+
+  // ── 查詢個人記錄 ──
+  async function lookupRecords() {
+    const name = document.getElementById('lookup-name').value.trim()
+    const res = document.getElementById('lookup-result')
+    if (!name) { res.innerHTML = '<div class="lookup-empty">請輸入名字再查詢</div>'; return }
+
+    res.innerHTML = '<div class="lookup-loading">查詢中…</div>'
+
+    const { data, error } = await db
+      .from('sleep_logs')
+      .select('date,bed_time,sleep_time,wake_time,up_time,wakeup_count,wake_duration,insomnia,quality,naps')
+      .eq('name', name)
+      .order('date', { ascending: false })
+      .limit(30)
+
+    if (error) { res.innerHTML = `<div class="lookup-empty">查詢失敗：${error.message}</div>`; return }
+    if (!data || data.length === 0) { res.innerHTML = '<div class="lookup-empty">找不到這個名字的記錄<br>請確認名字是否填寫正確</div>'; return }
+
+    const wdMap = { lt5:'5分內', '5-10':'5–10分', '10-15':'10–15分', '15-20':'15–20分', '20+':'20分以上' }
+    const wkMap = { none:'未曾醒來', '1-2':'醒1–2次', '3+':'醒3次以上' }
+    const fishStr = n => '🐟'.repeat(n)
+
+    function calcDur(s, w) {
+      if (!s||!w) return null
+      const m = t => { const [h,mm] = t.split(':').map(Number); return h*60+mm }
+      let d = m(w) - m(s); if (d<0) d+=1440
+      return Math.floor(d/60)+'h'+(d%60?d%60+'m':'')
+    }
+
+    function napSummary(napJson) {
+      try {
+        const naps = JSON.parse(napJson)
+        if (!naps || naps.length === 0) return null
+        return naps.map(n => `${n.start}–${n.end}`).join('、')
+      } catch { return null }
+    }
+
+    res.innerHTML = `<div class="my-records">${data.map(l => {
+      const dur = calcDur(l.sleep_time, l.wake_time)
+      const nap = l.naps ? napSummary(l.naps) : null
+      return `<div class="my-card">
+        <div class="my-card-date">${l.date}</div>
+        <div class="my-card-grid">
+          <div class="my-card-item"><div class="ci-label">躺床</div><div class="ci-val">${l.bed_time||'—'}</div></div>
+          <div class="my-card-item"><div class="ci-label">入睡</div><div class="ci-val">${l.sleep_time||'—'}</div></div>
+          <div class="my-card-item"><div class="ci-label">醒來</div><div class="ci-val">${l.wake_time||'—'}</div></div>
+          <div class="my-card-item"><div class="ci-label">起床</div><div class="ci-val">${l.up_time||'—'}</div></div>
+          ${dur ? `<div class="my-card-item"><div class="ci-label">睡眠時長</div><div class="ci-val">${dur}</div></div>` : ''}
+          <div class="my-card-item"><div class="ci-label">品質</div><div class="ci-val">${fishStr(l.quality)}</div></div>
+        </div>
+        ${nap ? `<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">小睡：${nap}</div>` : ''}
+        <div class="my-card-tags">
+          <span class="my-tag">${wkMap[l.wakeup_count]||l.wakeup_count}</span>
+          ${l.wake_duration ? `<span class="my-tag">${wdMap[l.wake_duration]||l.wake_duration}</span>` : ''}
+          <span class="my-tag ${l.insomnia?'warn':''}">${l.insomnia?'難以再入睡':'可順利再入睡'}</span>
+        </div>
+      </div>`
+    }).join('')}</div>`
   }
 </script>
 </body>
