@@ -6,118 +6,137 @@
 <title>睡眠日誌後台</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root{--bg:#f5f4f1;--surface:#fff;--border:#e8e5e0;--bstrong:#ccc9c2;--text:#1a1917;--muted:#6b6860;--hint:#a8a59f;--r:10px;--rl:14px;}
-  body{font-family:'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f4f1;--sur:#fff;--bdr:#e8e5e0;--bst:#ccc9c2;--txt:#1a1917;--mut:#6b6860;--hnt:#a8a59f;--r:10px;--rl:14px;
+  --c-nap:#a8c5b5;--c-bed:#c9a882;--c-sleep:#6b5a50;--c-wake:#e0d5c8;}
+body{font-family:'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
 
-  /* Login */
-  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;}
-  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:2rem;width:100%;max-width:340px;}
-  .login-card h1{font-size:18px;margin-bottom:4px;}
-  .login-card p{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
-  .login-card input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r);font-size:15px;font-family:inherit;background:var(--bg);color:var(--text);margin-bottom:10px;}
-  .login-card input:focus{outline:none;border-color:var(--bstrong);}
-  .login-btn{width:100%;padding:11px;background:var(--text);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-family:inherit;cursor:pointer;}
-  .login-err{font-size:13px;color:#a03030;margin-top:8px;display:none;}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+.login-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:2rem;width:100%;max-width:340px}
+.login-card h1{font-size:18px;margin-bottom:4px}
+.login-card p{font-size:13px;color:var(--mut);margin-bottom:1.5rem}
+.login-card input{width:100%;padding:10px 14px;border:1px solid var(--bdr);border-radius:var(--r);font-size:15px;font-family:inherit;background:var(--bg);color:var(--txt);margin-bottom:10px}
+.login-card input:focus{outline:none;border-color:var(--bst)}
+.login-btn{width:100%;padding:11px;background:var(--txt);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-family:inherit;cursor:pointer}
+.login-err{font-size:13px;color:#a03030;margin-top:8px;display:none}
 
-  .dashboard{display:none;}
-  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:10;}
-  .topbar h1{font-size:16px;font-weight:600;}
-  .topbar-right{display:flex;align-items:center;gap:10px;}
-  .icon-btn{padding:6px 14px;border:1px solid var(--bstrong);border-radius:var(--r);background:transparent;font-size:13px;font-family:inherit;cursor:pointer;color:var(--muted);}
-  .icon-btn:hover{color:var(--text);border-color:var(--text);}
+.dashboard{display:none}
+.topbar{background:var(--sur);border-bottom:1px solid var(--bdr);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:16px;font-weight:600}
+.topbar-r{display:flex;align-items:center;gap:10px}
+.ibtn{padding:6px 14px;border:1px solid var(--bst);border-radius:var(--r);background:transparent;font-size:13px;font-family:inherit;cursor:pointer;color:var(--mut)}
+.ibtn:hover{color:var(--txt);border-color:var(--txt)}
 
-  /* Tab nav */
-  .dash-nav{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 2rem;}
-  .dash-tab{padding:12px 20px;font-size:14px;font-weight:600;font-family:inherit;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
-  .dash-tab.active{color:var(--text);border-bottom-color:var(--text);}
+.dash-nav{display:flex;border-bottom:1px solid var(--bdr);background:var(--sur);padding:0 2rem}
+.dtab{padding:12px 20px;font-size:14px;font-weight:600;font-family:inherit;border:none;background:transparent;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent}
+.dtab.active{color:var(--txt);border-bottom-color:var(--txt)}
 
-  .dash-page{display:none;padding:2rem 1.5rem;}
-  .dash-page.active{display:block;}
-  .main-inner{max-width:1200px;margin:0 auto;}
+.dpage{display:none;padding:2rem 1.5rem}
+.dpage.active{display:block}
+.mi{max-width:1200px;margin:0 auto}
 
-  /* Summary cards */
-  .sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;}
-  .metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;}
-  .metric .ml{font-size:12px;color:var(--muted);margin-bottom:6px;}
-  .metric .mv{font-size:24px;font-weight:600;letter-spacing:-.5px;}
-  .metric .ms{font-size:12px;color:var(--hint);margin-top:3px;}
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem}
+.metric{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 18px}
+.metric .ml{font-size:12px;color:var(--mut);margin-bottom:6px}
+.metric .mv{font-size:24px;font-weight:600;letter-spacing:-.5px}
+.metric .ms{font-size:12px;color:var(--hnt);margin-top:3px}
 
-  /* Controls */
-  .controls{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px;}
-  .ctrl-l{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-  .fi{padding:7px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);}
-  .fi:focus{outline:none;border-color:var(--bstrong);}
-  select.fi{cursor:pointer;}
-  .act-btn{padding:7px 14px;border:1px solid var(--bstrong);border-radius:var(--r);background:var(--surface);font-size:13px;font-family:inherit;cursor:pointer;color:var(--text);}
-  .act-btn:hover{background:var(--bg);}
+.ctrl{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px}
+.ctrl-l{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fi{padding:7px 12px;border:1px solid var(--bdr);border-radius:var(--r);font-size:13px;font-family:inherit;background:var(--sur);color:var(--txt)}
+.fi:focus{outline:none;border-color:var(--bst)}
+select.fi{cursor:pointer}
+.abtn{padding:7px 14px;border:1px solid var(--bst);border-radius:var(--r);background:var(--sur);font-size:13px;font-family:inherit;cursor:pointer;color:var(--txt)}
+.abtn:hover{background:var(--bg)}
 
-  /* Table */
-  .tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:950px;}
-  thead{background:var(--bg);}
-  th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--hint);border-bottom:1px solid var(--border);white-space:nowrap;}
-  td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
-  tr:last-child td{border-bottom:none;}
-  tr:hover td{background:var(--bg);}
-  .nm{font-weight:600;white-space:nowrap;}
-  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap;}
-  .bg{background:#f0eeeb;color:var(--muted);}
-  .bw{background:#fff3e0;color:#c17700;}
-  .bd{background:#fff0f0;color:#c03030;}
-  .bo{background:#f0f7f0;color:#2a7a3a;}
-  .tc{white-space:nowrap;}
-  .dc{font-size:12px;color:var(--muted);white-space:nowrap;}
-  .rtotal{font-size:13px;color:var(--muted);}
+.tw{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:950px}
+thead{background:var(--bg)}
+th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--hnt);border-bottom:1px solid var(--bdr);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.nm{font-weight:600;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap}
+.bg{background:#f0eeeb;color:var(--mut)} .bw{background:#fff3e0;color:#c17700}
+.bd{background:#fff0f0;color:#c03030} .bo{background:#f0f7f0;color:#2a7a3a}
+.tc{white-space:nowrap} .dc{font-size:12px;color:var(--mut);white-space:nowrap}
+.rtotal{font-size:13px;color:var(--mut)}
 
-  /* Report 頁 */
-  .report-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.5rem;margin-bottom:1.5rem;}
-  .report-form h3{font-size:15px;font-weight:600;margin-bottom:1rem;}
-  .rf-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
-  .rf-field{display:flex;flex-direction:column;gap:5px;}
-  .rf-field label{font-size:12px;color:var(--muted);}
-  .rf-field input,.rf-field select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);}
-  .rf-field input:focus,.rf-field select:focus{outline:none;border-color:var(--bstrong);}
-  .gen-btn{padding:10px 20px;background:var(--text);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
-  .gen-btn:hover{opacity:.85;}
+/* Report */
+.rform{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:1.5rem;margin-bottom:1.5rem}
+.rform h3{font-size:15px;font-weight:600;margin-bottom:1rem}
+.rf-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.rf-field{display:flex;flex-direction:column;gap:5px}
+.rf-field label{font-size:12px;color:var(--mut)}
+.rf-field input,.rf-field select{padding:9px 12px;border:1px solid var(--bdr);border-radius:var(--r);font-size:14px;font-family:inherit;background:var(--bg);color:var(--txt)}
+.rf-field input:focus,.rf-field select:focus{outline:none;border-color:var(--bst)}
+.gbtn{padding:10px 20px;background:var(--txt);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+.gbtn:hover{opacity:.85}
 
-  .report-output{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.5rem;display:none;}
-  .report-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px;}
-  .report-title{font-size:18px;font-weight:700;}
-  .report-sub{font-size:13px;color:var(--muted);margin-top:3px;}
-  .report-print-btn{padding:7px 16px;border:1px solid var(--bstrong);border-radius:var(--r);background:transparent;font-size:13px;font-family:inherit;cursor:pointer;}
+.rout{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:1.5rem;display:none}
+.rhd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px}
+.rtitle{font-size:18px;font-weight:700}
+.rsub{font-size:13px;color:var(--mut);margin-top:3px}
+.rpbtn{padding:7px 16px;border:1px solid var(--bst);border-radius:var(--r);background:transparent;font-size:13px;font-family:inherit;cursor:pointer}
 
-  /* 7日日誌表格 */
-  .journal-table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;font-size:13px;}
-  .journal-table th{padding:8px 12px;background:#f8f6f3;border:1px solid var(--border);font-weight:600;text-align:center;font-size:12px;}
-  .journal-table td{padding:8px 12px;border:1px solid var(--border);text-align:center;vertical-align:top;}
-  .journal-table .day-col{font-weight:600;white-space:nowrap;}
-  .holiday-row{background:#fdf9f0;}
+/* 圖例 */
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+.leg-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0}
 
-  /* 分析區 */
-  .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem;}
-  .analysis-card{background:#f8f6f3;border-radius:var(--r);padding:14px 16px;}
-  .analysis-card h4{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;}
-  .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border);}
-  .stat-row:last-child{border-bottom:none;}
-  .stat-label{font-size:13px;color:var(--muted);}
-  .stat-val{font-size:14px;font-weight:600;}
-  .stat-val.low{color:#c03030;}
-  .stat-val.ok{color:#2a7a3a;}
-  .stat-val.mid{color:#c17700;}
+/* ── 甘特圖 ── */
+.gantt-wrap{overflow-x:auto;margin-bottom:2rem}
+.gantt-container{min-width:700px}
+.gantt-axis{display:flex;margin-left:90px;margin-bottom:4px}
+.gantt-axis-label{font-size:10px;color:var(--hnt);text-align:center;flex-shrink:0}
+.gantt-row{display:flex;align-items:center;margin-bottom:6px}
+.gantt-label{width:90px;font-size:12px;color:var(--mut);flex-shrink:0;padding-right:8px;text-align:right;line-height:1.3}
+.gantt-label .gdate{font-weight:600;color:var(--txt);font-size:12px}
+.gantt-label .gday{font-size:10px}
+.gantt-bar-row{flex:1;position:relative;height:28px;background:#f5f3f0;border-radius:4px;overflow:hidden}
+.gantt-seg{position:absolute;top:0;height:100%;border-radius:0}
 
-  /* 小結 */
-  .summary-box{background:#f8f6f3;border-radius:var(--r);padding:16px 18px;margin-bottom:1.5rem;}
-  .summary-box h4{font-size:14px;font-weight:600;margin-bottom:10px;}
-  .summary-box p{font-size:14px;line-height:1.75;color:var(--text);}
-  .overall{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-weight:600;}
+/* ── 分析圖表 ── */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem}
+.chart-card{background:#f8f6f3;border-radius:var(--r);padding:14px 16px}
+.chart-card h4{font-size:12px;font-weight:600;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em}
+.chart-card canvas{max-height:160px}
 
-  .no-report{text-align:center;padding:3rem;color:var(--hint);font-size:14px;}
-  .rpt-empty{text-align:center;padding:2rem;color:var(--hint);font-size:13px;}
+/* 單欄大圖 */
+.chart-card.wide{grid-column:1/-1}
+.chart-card.wide canvas{max-height:120px}
 
-  @media(max-width:768px){.sum-grid{grid-template-columns:repeat(2,1fr)};.topbar{padding:0 1rem};.dash-page{padding:1.25rem 1rem};.analysis-grid{grid-template-columns:1fr};}
-  @media print{.topbar,.dash-nav,.report-form,.report-print-btn,.controls,.act-btn{display:none!important}.report-output{display:block!important;border:none;padding:0}}
+/* 統計數字 */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem}
+.scard{background:#f8f6f3;border-radius:var(--r);padding:12px 14px}
+.scard .sl{font-size:11px;color:var(--hnt);margin-bottom:4px}
+.scard .sv{font-size:18px;font-weight:700}
+.scard .sv.ok{color:#2a7a3a} .scard .sv.mid{color:#c17700} .scard .sv.low{color:#c03030}
+.scard .ss{font-size:11px;color:var(--mut);margin-top:2px}
+
+/* 小結 */
+.sum-box{background:#f8f6f3;border-radius:var(--r);padding:16px 18px;margin-bottom:1.5rem}
+.sum-box h4{font-size:14px;font-weight:600;margin-bottom:10px}
+.sum-box p{font-size:14px;line-height:1.8;color:var(--txt)}
+.overall{display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);font-weight:600}
+
+.no-rpt{text-align:center;padding:3rem;color:var(--hnt);font-size:14px}
+
+@media(max-width:768px){
+  .sg{grid-template-columns:repeat(2,1fr)}
+  .topbar,.dash-nav{padding:0 1rem}
+  .dpage{padding:1.25rem 1rem}
+  .charts-grid{grid-template-columns:1fr}
+  .chart-card.wide{grid-column:auto}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media print{
+  .topbar,.dash-nav,.rform,.rpbtn,.ctrl,.abtn{display:none!important}
+  .rout{display:block!important;border:none;padding:0}
+}
 </style>
 </head>
 <body>
@@ -135,48 +154,46 @@
 <div class="dashboard" id="dashboard">
   <div class="topbar">
     <h1>🐻 睡眠日誌後台</h1>
-    <div class="topbar-right">
+    <div class="topbar-r">
       <span class="rtotal" id="record-total"></span>
-      <button class="icon-btn" onclick="loadData()">重新整理</button>
-      <button class="icon-btn" onclick="logout()">登出</button>
+      <button class="ibtn" onclick="loadData()">重新整理</button>
+      <button class="ibtn" onclick="logout()">登出</button>
     </div>
   </div>
 
   <div class="dash-nav">
-    <button class="dash-tab active" onclick="switchDash('data',this)">所有記錄</button>
-    <button class="dash-tab" onclick="switchDash('report',this)">7日睡眠報告</button>
+    <button class="dtab active" onclick="switchDash('data',this)">所有記錄</button>
+    <button class="dtab" onclick="switchDash('report',this)">7日睡眠報告</button>
   </div>
 
   <!-- 記錄頁 -->
-  <div class="dash-page active" id="dp-data">
-    <div class="main-inner">
-      <div class="sum-grid">
+  <div class="dpage active" id="dp-data">
+    <div class="mi">
+      <div class="sg">
         <div class="metric"><div class="ml">總筆數</div><div class="mv" id="s-total">—</div><div class="ms">份日誌</div></div>
-        <div class="metric"><div class="ml">平均睡眠時數</div><div class="mv" id="s-sleep">—</div><div class="ms">小時 / 晚</div></div>
+        <div class="metric"><div class="ml">平均睡眠時數</div><div class="mv" id="s-sleep">—</div><div class="ms">小時/晚</div></div>
         <div class="metric"><div class="ml">平均入睡品質</div><div class="mv" id="s-quality">—</div><div class="ms">/ 5 分</div></div>
         <div class="metric"><div class="ml">難以再入睡比率</div><div class="mv" id="s-insomnia">—</div><div class="ms">的記錄有此情形</div></div>
       </div>
-      <div class="controls">
+      <div class="ctrl">
         <div class="ctrl-l">
-          <input class="fi" type="text" id="filter-name" placeholder="搜尋名字" oninput="applyFilter()">
-          <input class="fi" type="date" id="filter-from" onchange="applyFilter()">
-          <span style="font-size:13px;color:var(--muted)">至</span>
-          <input class="fi" type="date" id="filter-to" onchange="applyFilter()">
-          <select class="fi" id="filter-quality" onchange="applyFilter()">
+          <input class="fi" type="text" id="fn" placeholder="搜尋名字" oninput="applyFilter()">
+          <input class="fi" type="date" id="ff" onchange="applyFilter()">
+          <span style="font-size:13px;color:var(--mut)">至</span>
+          <input class="fi" type="date" id="ft" onchange="applyFilter()">
+          <select class="fi" id="fq" onchange="applyFilter()">
             <option value="">所有品質</option>
             <option value="5">🐟×5</option><option value="4">🐟×4</option>
             <option value="3">🐟×3</option><option value="2">🐟×2</option><option value="1">🐟×1</option>
           </select>
-          <select class="fi" id="filter-wakeup" onchange="applyFilter()">
+          <select class="fi" id="fw" onchange="applyFilter()">
             <option value="">所有醒來</option>
-            <option value="none">未曾醒來</option>
-            <option value="1-2">醒1–2次</option>
-            <option value="3+">醒3次以上</option>
+            <option value="none">未曾醒來</option><option value="1-2">醒1–2次</option><option value="3+">醒3次以上</option>
           </select>
         </div>
-        <button class="act-btn" onclick="exportCSV()">⬇ 匯出 CSV</button>
+        <button class="abtn" onclick="exportCSV()">⬇ 匯出 CSV</button>
       </div>
-      <div class="tbl-wrap">
+      <div class="tw">
         <table>
           <thead><tr>
             <th>名字</th><th>日期</th><th>躺床</th><th>入睡</th>
@@ -185,7 +202,7 @@
             <th>難以再入睡</th><th>品質</th><th>填寫時間</th>
           </tr></thead>
           <tbody id="table-body">
-            <tr><td colspan="13" style="text-align:center;color:var(--hint);padding:2rem">載入中...</td></tr>
+            <tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr>
           </tbody>
         </table>
       </div>
@@ -193,9 +210,9 @@
   </div>
 
   <!-- 報告頁 -->
-  <div class="dash-page" id="dp-report">
-    <div class="main-inner">
-      <div class="report-form">
+  <div class="dpage" id="dp-report">
+    <div class="mi">
+      <div class="rform">
         <h3>產生 7 日睡眠報告</h3>
         <div class="rf-row">
           <div class="rf-field">
@@ -206,444 +223,453 @@
             <label>選取結束日期（往前7天）</label>
             <input type="date" id="rpt-end">
           </div>
-          <button class="gen-btn" onclick="generateReport()">產生報告</button>
+          <button class="gbtn" onclick="generateReport()">產生報告</button>
         </div>
       </div>
 
-      <div class="report-output" id="report-output">
-        <div class="report-header">
+      <div class="rout" id="report-output">
+        <div class="rhd">
           <div>
-            <div class="report-title" id="rpt-title"></div>
-            <div class="report-sub" id="rpt-sub"></div>
+            <div class="rtitle" id="rpt-title"></div>
+            <div class="rsub" id="rpt-sub"></div>
           </div>
-          <button class="report-print-btn" onclick="window.print()">🖨️ 列印 / 存 PDF</button>
+          <button class="rpbtn" onclick="window.print()">🖨️ 列印 / 存 PDF</button>
         </div>
-        <div id="rpt-journal"></div>
-        <div id="rpt-analysis"></div>
-        <div id="rpt-summary"></div>
+        <div id="rpt-content"></div>
       </div>
 
-      <div class="no-report" id="no-report">
-        <p>請選擇填寫者名字與日期範圍後，點選「產生報告」</p>
-      </div>
+      <div class="no-rpt" id="no-rpt">請選擇填寫者名字與日期範圍後，點選「產生報告」</div>
     </div>
   </div>
 </div>
 
 <script>
-  // ====================================================
+// ====================================================
   // 🔧 Supabase 專案資訊
   const SUPABASE_URL = 'https://wxdyrowwzdptktdravpb.supabase.co'
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZHlyb3d3emRwdGt0ZHJhdnBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQwMzgsImV4cCI6MjA5MDU1MDAzOH0.G_v_X_aU8QCu5baa3PqktYAMniVzMIcDqpBuZEO_uFQ'
   const ADMIN_PASSWORD = 'sleep804'
-  // ====================================================
+// ====================================================
 
-  const { createClient } = supabase
-  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+let allLogs = [], filtered = []
+let chartInstances = []
 
-  let allLogs = [], filtered = []
+function doLogin() {
+  if (document.getElementById('pwd-input').value === ADMIN_PASSWORD) {
+    document.getElementById('login-wrap').style.display = 'none'
+    document.getElementById('dashboard').style.display = 'block'
+    document.getElementById('rpt-end').value = new Date().toISOString().slice(0,10)
+    loadData()
+  } else {
+    const e = document.getElementById('login-err')
+    e.style.display = 'block'; setTimeout(()=>e.style.display='none',2000)
+  }
+}
+function logout() {
+  document.getElementById('login-wrap').style.display = 'flex'
+  document.getElementById('dashboard').style.display = 'none'
+  document.getElementById('pwd-input').value = ''
+}
+function switchDash(name, btn) {
+  document.querySelectorAll('.dpage').forEach(p=>p.classList.remove('active'))
+  document.querySelectorAll('.dtab').forEach(b=>b.classList.remove('active'))
+  document.getElementById('dp-'+name).classList.add('active')
+  btn.classList.add('active')
+}
 
-  function doLogin() {
-    if (document.getElementById('pwd-input').value === ADMIN_PASSWORD) {
-      document.getElementById('login-wrap').style.display = 'none'
-      document.getElementById('dashboard').style.display = 'block'
-      document.getElementById('rpt-end').value = new Date().toISOString().slice(0,10)
-      loadData()
-    } else {
-      const e = document.getElementById('login-err')
-      e.style.display = 'block'; setTimeout(()=>e.style.display='none',2000)
+async function loadData() {
+  document.getElementById('table-body').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr>'
+  const { data, error } = await db.from('sleep_logs').select('*').order('date',{ascending:false})
+  if (error) { document.getElementById('table-body').innerHTML=`<tr><td colspan="13" style="text-align:center;color:#a03030;padding:2rem">載入失敗：${error.message}</td></tr>`; return }
+  allLogs = data||[]; applyFilter(); updateSummary(allLogs)
+}
+
+function applyFilter() {
+  const name=document.getElementById('fn').value.trim().toLowerCase()
+  const from=document.getElementById('ff').value
+  const to=document.getElementById('ft').value
+  const qual=document.getElementById('fq').value
+  const wk=document.getElementById('fw').value
+  filtered = allLogs.filter(l=>{
+    if(name&&!(l.name||'').toLowerCase().includes(name))return false
+    if(from&&l.date<from)return false
+    if(to&&l.date>to)return false
+    if(qual&&l.quality!=qual)return false
+    if(wk&&l.wakeup_count!==wk)return false
+    return true
+  })
+  renderTable(filtered)
+  document.getElementById('record-total').textContent=`顯示 ${filtered.length} / ${allLogs.length} 筆`
+}
+
+// ── 工具 ──
+function toMins(t){if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m}
+function calcDur(s,w){if(!s||!w)return null;let d=toMins(w)-toMins(s);if(d<0)d+=1440;return d}
+function fmtDur(m){if(m==null)return'—';return Math.floor(m/60)+'h'+(m%60?m%60+'m':'')}
+function fmtDurH(m){if(m==null)return'—';return(m/60).toFixed(1)+'h'}
+function avg(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null}
+
+function napTotal(nj){try{const n=JSON.parse(nj);if(!n||!n.length)return 0;return n.reduce((a,x)=>{const d=calcDur(x.start,x.end);return a+(d||0)},0)}catch{return 0}}
+function napStr(nj){try{const n=JSON.parse(nj);if(!n||!n.length)return'—';return n.map(x=>`${x.start}–${x.end}`).join(' ')}catch{return'—'}}
+function wasoMins(l){if(l.wakeup_count==='none')return 0;const dm={lt5:3,'5-10':7,'10-15':12,'15-20':17,'20+':25};const p=dm[l.wake_duration]||0;const t=l.wakeup_count==='1-2'?1.5:4;return Math.round(p*t)}
+function wdLabel(v){return{lt5:'5分內','5-10':'5–10分','10-15':'10–15分','15-20':'15–20分','20+':'20分以上'}[v]||v||'—'}
+function wkLabel(v){return{none:'未曾醒來','1-2':'醒1–2次','3+':'醒3次以上'}[v]||v}
+function wkBadge(v){return{none:'bo','1-2':'bw','3+':'bd'}[v]||'bg'}
+function fishHTML(n){return'🐟'.repeat(n)+'<span style="opacity:.2">'+'🐟'.repeat(5-n)+'</span>'}
+function fmtDT(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})+' '+d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
+function isHoliday(ds){const d=new Date(ds);return d.getDay()===0||d.getDay()===6}
+
+function renderTable(logs){
+  const tb=document.getElementById('table-body')
+  if(!logs.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">沒有符合條件的記錄</td></tr>';return}
+  tb.innerHTML=logs.map(l=>{
+    const dur=calcDur(l.sleep_time,l.wake_time)
+    return`<tr>
+      <td class="nm">${l.name||'—'}</td>
+      <td class="tc"><strong>${l.date}</strong></td>
+      <td class="tc">${l.bed_time||'—'}</td><td class="tc">${l.sleep_time||'—'}</td>
+      <td class="tc">${l.wake_time||'—'}</td><td class="tc">${l.up_time||'—'}</td>
+      <td class="dc">${dur!=null?fmtDur(dur):'—'}</td>
+      <td class="dc">${l.naps?napStr(l.naps):'—'}</td>
+      <td><span class="badge ${wkBadge(l.wakeup_count)}">${wkLabel(l.wakeup_count)}</span></td>
+      <td class="dc">${wdLabel(l.wake_duration)}</td>
+      <td><span class="badge ${l.insomnia?'bd':'bo'}">${l.insomnia?'是':'否'}</span></td>
+      <td>${fishHTML(l.quality)}</td>
+      <td style="color:var(--hnt);font-size:12px">${fmtDT(l.created_at)}</td>
+    </tr>`
+  }).join('')
+}
+
+function updateSummary(logs){
+  document.getElementById('s-total').textContent=logs.length
+  const durs=logs.map(l=>calcDur(l.sleep_time,l.wake_time)).filter(v=>v!=null)
+  document.getElementById('s-sleep').textContent=durs.length?(durs.reduce((a,b)=>a+b,0)/durs.length/60).toFixed(1):'—'
+  if(logs.length){
+    document.getElementById('s-quality').textContent=(logs.reduce((a,l)=>a+l.quality,0)/logs.length).toFixed(1)
+    document.getElementById('s-insomnia').textContent=Math.round(logs.filter(l=>l.insomnia).length/logs.length*100)+'%'
+  }
+}
+
+function exportCSV(){
+  if(!filtered.length)return
+  const h=['名字','日期','躺床','入睡','醒來','起床','睡眠時長(分)','小睡','中間醒來','醒來時長','難以再入睡','品質','填寫時間']
+  const rows=filtered.map(l=>[l.name||'',l.date,l.bed_time||'',l.sleep_time||'',l.wake_time||'',l.up_time||'',calcDur(l.sleep_time,l.wake_time)||'',l.naps?napStr(l.naps):'',wkLabel(l.wakeup_count),wdLabel(l.wake_duration),l.insomnia?'是':'否',l.quality,l.created_at||''])
+  const csv=[h,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')
+  const a=document.createElement('a')
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}))
+  a.download=`睡眠日誌_${new Date().toISOString().slice(0,10)}.csv`;a.click()
+}
+
+// ══════════════════════════════════════════
+// 7日報告
+// ══════════════════════════════════════════
+async function generateReport(){
+  const name=document.getElementById('rpt-name').value.trim()
+  const endStr=document.getElementById('rpt-end').value
+  if(!name||!endStr){alert('請填寫名字與結束日期');return}
+
+  const endDate=new Date(endStr)
+  const startDate=new Date(endDate); startDate.setDate(startDate.getDate()-6)
+  const startStr=startDate.toISOString().slice(0,10)
+
+  const {data,error}=await db.from('sleep_logs').select('*').eq('name',name).gte('date',startStr).lte('date',endStr).order('date',{ascending:true})
+
+  document.getElementById('no-rpt').style.display='none'
+  const out=document.getElementById('report-output')
+
+  if(error||!data||data.length===0){
+    out.style.display='none'
+    document.getElementById('no-rpt').style.display='block'
+    document.getElementById('no-rpt').textContent=`找不到「${name}」在 ${startStr} 至 ${endStr} 的記錄`
+    return
+  }
+
+  // 銷毀舊圖表
+  chartInstances.forEach(c=>c.destroy()); chartInstances=[]
+
+  const logs=data
+  const weekday=logs.filter(l=>!isHoliday(l.date))
+  const holiday=logs.filter(l=>isHoliday(l.date))
+
+  function getTIB(l){return calcDur(l.bed_time,l.up_time)}
+  function getTST_N(l){const b=calcDur(l.sleep_time,l.wake_time);if(b==null)return null;return Math.max(0,b-wasoMins(l))}
+  function getTST_A(l){const n=getTST_N(l);if(n==null)return null;return n+(l.naps?napTotal(l.naps):0)}
+  function getSOL(l){return calcDur(l.bed_time,l.sleep_time)}
+  function getEff(l){const n=getTST_N(l);const t=getTIB(l);if(!n||!t||t===0)return null;return n/t}
+
+  const allTST_A=logs.map(getTST_A).filter(v=>v!=null)
+  const wdTST_A=weekday.map(getTST_A).filter(v=>v!=null)
+  const hdTST_A=holiday.map(getTST_A).filter(v=>v!=null)
+  const wdTST_N=weekday.map(getTST_N).filter(v=>v!=null)
+  const hdTST_N=holiday.map(getTST_N).filter(v=>v!=null)
+  const wdNap=weekday.map(l=>l.naps?napTotal(l.naps):0)
+  const hdNap=holiday.map(l=>l.naps?napTotal(l.naps):0)
+  const wdWASO=weekday.map(wasoMins)
+  const hdWASO=holiday.map(wasoMins)
+  const wdSOL=weekday.map(getSOL).filter(v=>v!=null)
+  const hdSOL=holiday.map(getSOL).filter(v=>v!=null)
+  const avgEff=avg(logs.map(getEff).filter(v=>v!=null))
+
+  const stats={
+    avgAll:avg(allTST_A), avgWD:avg(wdTST_A), avgHD:avg(hdTST_A),
+    avgNightWD:avg(wdTST_N), avgNightHD:avg(hdTST_N),
+    avgNapWD:avg(wdNap.filter(v=>v>0)), avgNapHD:avg(hdNap.filter(v=>v>0)),
+    avgWASO_WD:avg(wdWASO), avgWASO_HD:avg(hdWASO),
+    avgSOL_WD:avg(wdSOL), avgSOL_HD:avg(hdSOL),
+  }
+
+  // ── 小結文字 ──
+  function buildSummary(){
+    const lines=[]
+    const wh=stats.avgAll!=null?stats.avgAll/60:null
+    if(wh!=null){
+      if(wh>=11)lines.push('熊愛睏發現你整體睡得充足、滿滿有活力！')
+      else if(wh>=10)lines.push('熊愛睏發現你整體睡得剛剛好，有不錯的精神！')
+      else if(wh>=9)lines.push('熊愛睏發現你整體睡得有點短，白天可能容易有點累累的。')
+      else lines.push('熊愛睏發現你整體睡眠時間明顯不足，需要特別處理一下！')
     }
-  }
-  function logout() {
-    document.getElementById('login-wrap').style.display = 'flex'
-    document.getElementById('dashboard').style.display = 'none'
-    document.getElementById('pwd-input').value = ''
+    if(stats.avgNightWD!=null){
+      const h=(stats.avgNightWD+(stats.avgNightHD||stats.avgNightWD))/2/60
+      if(h>=10)lines.push('熊愛睏發現你晚上睡得很充足，晚上的休息品質良好。')
+      else if(h>=9)lines.push('熊愛睏發現你晚上睡得還不錯，晚上有基本的休息。')
+      else if(h>=8)lines.push('熊愛睏發現你晚上睡得有點短，醒著是不是比較容易有情緒？')
+      else lines.push('熊愛睏發現你夜間睡眠時間偏短，要不要跟熊愛睏一起練習提早上床時間呢？')
+    }
+    const hasNap=wdNap.some(v=>v>0)||hdNap.some(v=>v>0)
+    if(hasNap){
+      const avgN=avg([...wdNap,...hdNap].filter(v=>v>0))
+      if(avgN>=90)lines.push('熊愛睏發現你小睡剛剛好，下午也電力充足！')
+      else if(avgN>=30)lines.push('熊愛睏發現你小睡時間稍短，可再看看需不需要調整。')
+      else lines.push('熊愛睏發現你小睡時間很少，白天會不會感覺太累呢？')
+    }
+    const wakeRate=logs.filter(l=>l.wakeup_count!=='none').length/logs.length
+    if(wakeRate<0.2)lines.push('熊愛睏發現你半夜幾乎不會醒，睡得很沉。')
+    else if(wakeRate<0.5)lines.push('熊愛睏發現你偶爾會在夜間醒來，整體算平穩。')
+    else lines.push('熊愛睏發現你夜間醒來的頻率較高，需要關注入睡環境。')
+    if(stats.avgSOL_WD!=null){
+      const m=(stats.avgSOL_WD+(stats.avgSOL_HD||stats.avgSOL_WD))/2
+      if(m<=20)lines.push('熊愛睏發現你入睡時間剛剛好。')
+      else if(m<=30)lines.push('熊愛睏發現你入睡需要稍微多一點時間，可嘗試睡前放鬆。')
+      else lines.push('熊愛睏發現你入睡較困難，建議再進行一次好眠窩評分。')
+    }
+    if(avgEff!=null){
+      if(avgEff>=0.9)lines.push('熊愛睏發現你睡眠效率非常好，晚上能夠睡好睡滿。')
+      else if(avgEff>=0.8)lines.push('熊愛睏發現你睡眠效率不錯，躺床時間大部分都在睡覺。')
+      else lines.push('熊愛睏發現你睡眠效率偏低，可能有較多在床上清醒的時間。')
+    }
+    const bedTimes=logs.map(l=>toMins(l.bed_time)).filter(v=>v!=null)
+    if(bedTimes.length>=4){
+      const m=avg(bedTimes)
+      const sd=Math.sqrt(avg(bedTimes.map(t=>(t-m)**2)))
+      if(sd<=30)lines.push('熊愛睏發現你上床睡覺和起床的時間都很規律。')
+      else if(sd<=60)lines.push('熊愛睏發現你作息時間大致規律，週末和平日稍有差異。')
+      else lines.push('熊愛睏發現你上下床時間起伏較大，建議維持固定作息。')
+    }
+    const sc=(wh||0)+(avgEff||0)*2+(wakeRate<0.3?1:0)
+    let overall=''
+    if(sc>=13)overall='整體來說你是睡眠超棒的好眠達人喔！'
+    else if(sc>=11)overall='整體來說你的睡眠不錯，繼續保持好習慣！'
+    else if(sc>=9)overall='整體來說你的睡眠還有進步空間，一起努力調整！'
+    else overall='整體來說你的睡眠需要多加關注，建議諮詢專業人員。'
+    return{lines,overall}
   }
 
-  function switchDash(name, btn) {
-    document.querySelectorAll('.dash-page').forEach(p => p.classList.remove('active'))
-    document.querySelectorAll('.dash-tab').forEach(b => b.classList.remove('active'))
-    document.getElementById('dp-'+name).classList.add('active')
-    btn.classList.add('active')
+  const {lines,overall}=buildSummary()
+  const dayNames=['日','一','二','三','四','五','六']
+
+  // ── 標題 ──
+  document.getElementById('rpt-title').textContent=`${name} 的 7 日睡眠報告`
+  document.getElementById('rpt-sub').textContent=`${startStr} ～ ${endStr}（共 ${logs.length} 筆記錄）`
+
+  // ── 甘特圖 HTML ──
+  // 時間軸從 12:00 到 隔天 11:00（24小時）
+  // 顯示每整點標籤
+  const AXIS_START = 12*60  // 720分鐘 = 中午12點
+  const AXIS_TOTAL = 24*60  // 1440分鐘
+  const hourLabels = []
+  for(let h=12;h<36;h++){
+    const hh=h%24
+    if(hh===0)hourLabels.push('午夜')
+    else if(hh<12)hourLabels.push(`${hh}時`)
+    else if(hh===12)hourLabels.push('中午')
+    else hourLabels.push(`${hh}時`)
   }
 
-  async function loadData() {
-    document.getElementById('table-body').innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--hint);padding:2rem">載入中...</td></tr>'
-    const { data, error } = await db.from('sleep_logs').select('*').order('date', { ascending: false })
-    if (error) { document.getElementById('table-body').innerHTML = `<tr><td colspan="13" style="text-align:center;color:#a03030;padding:2rem">載入失敗：${error.message}</td></tr>`; return }
-    allLogs = data || []
-    applyFilter(); updateSummary(allLogs)
+  function pct(mins){ return((mins - AXIS_START + AXIS_TOTAL) % AXIS_TOTAL / AXIS_TOTAL * 100).toFixed(3)+'%' }
+  function pctW(mins){ return(mins / AXIS_TOTAL * 100).toFixed(3)+'%' }
+
+  // 畫每天的bar
+  function buildGanttRow(l){
+    const segs=[]
+    const napJson=l.naps?JSON.parse(l.naps||'[]'):[]
+
+    // 小睡區塊（綠色）
+    if(Array.isArray(napJson)){
+      napJson.forEach(n=>{
+        const s=toMins(n.start); const e=toMins(n.end)
+        if(s==null||e==null)return
+        const sAdj=s<AXIS_START?s+AXIS_TOTAL:s
+        const dur=e>s?e-s:e+AXIS_TOTAL-s
+        segs.push(`<div class="gantt-seg" style="left:${pct(sAdj)};width:${pctW(dur)};background:var(--c-nap);opacity:0.85"></div>`)
+      })
+    }
+
+    // 躺床到入睡（淺棕）
+    if(l.bed_time&&l.sleep_time){
+      const b=toMins(l.bed_time); const s=toMins(l.sleep_time)
+      const bAdj=b<AXIS_START?b+AXIS_TOTAL:b
+      const sol=calcDur(l.bed_time,l.sleep_time)||0
+      segs.push(`<div class="gantt-seg" style="left:${pct(bAdj)};width:${pctW(sol)};background:var(--c-bed)"></div>`)
+    }
+
+    // 睡著到醒來（深棕）
+    if(l.sleep_time&&l.wake_time){
+      const s=toMins(l.sleep_time); const w=toMins(l.wake_time)
+      const sAdj=s<AXIS_START?s+AXIS_TOTAL:s
+      const tst=calcDur(l.sleep_time,l.wake_time)||0
+      segs.push(`<div class="gantt-seg" style="left:${pct(sAdj)};width:${pctW(tst)};background:var(--c-sleep)"></div>`)
+    }
+
+    return segs.join('')
   }
 
-  function applyFilter() {
-    const name = document.getElementById('filter-name').value.trim().toLowerCase()
-    const from = document.getElementById('filter-from').value
-    const to   = document.getElementById('filter-to').value
-    const qual = document.getElementById('filter-quality').value
-    const wk   = document.getElementById('filter-wakeup').value
-    filtered = allLogs.filter(l => {
-      if (name && !(l.name||'').toLowerCase().includes(name)) return false
-      if (from && l.date < from) return false
-      if (to && l.date > to) return false
-      if (qual && l.quality != qual) return false
-      if (wk && l.wakeup_count !== wk) return false
-      return true
+  // 軸標籤（每2小時顯示一個）
+  const axisHTML=`<div class="gantt-axis" style="margin-left:90px">
+    ${hourLabels.map((l,i)=>`<div class="gantt-axis-label" style="width:${100/24}%">${i%2===0?l:''}</div>`).join('')}
+  </div>`
+
+  const ganttRows=logs.map(l=>{
+    const d=new Date(l.date)
+    const hol=isHoliday(l.date)
+    return`<div class="gantt-row">
+      <div class="gantt-label">
+        <div class="gdate">${l.date.slice(5)}</div>
+        <div class="gday">${dayNames[d.getDay()]}${hol?' 假':' 平'}</div>
+      </div>
+      <div class="gantt-bar-row">${buildGanttRow(l)}</div>
+    </div>`
+  }).join('')
+
+  // ── 長條圖資料 ──
+  const dateLabels=logs.map(l=>{const d=new Date(l.date);return`${l.date.slice(5)}(${dayNames[d.getDay()]})`})
+  const tst_a_data=logs.map(l=>{const v=getTST_A(l);return v!=null?(v/60).toFixed(1):null})
+  const tst_n_data=logs.map(l=>{const v=getTST_N(l);return v!=null?(v/60).toFixed(1):null})
+  const nap_data=logs.map(l=>(l.naps?napTotal(l.naps):0)/60)
+  const sol_data=logs.map(l=>{const v=getSOL(l);return v!=null?v:null})
+  const waso_data=logs.map(l=>wasoMins(l))
+  const eff_data=logs.map(l=>{const v=getEff(l);return v!=null?Math.round(v*100):null})
+  const qual_data=logs.map(l=>l.quality)
+
+  const chartCfg=(labels,datasets,unit,maxY)=>({
+    type:'bar',
+    data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:datasets.length>1,labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label||''}：${ctx.parsed.y}${unit}`}}},
+      scales:{
+        x:{ticks:{font:{size:10}},grid:{display:false}},
+        y:{beginAtZero:true,max:maxY,ticks:{font:{size:10}},grid:{color:'#ece8e3'}}
+      }
+    }
+  })
+
+  const COLORS={sleep:'rgba(107,90,80,0.85)',nap:'rgba(168,197,181,0.85)',bed:'rgba(201,168,130,0.7)',waso:'rgba(192,135,80,0.8)',sol:'rgba(160,120,100,0.8)',eff:'rgba(107,90,80,0.7)',qual:'rgba(139,107,80,0.85)'}
+
+  // ── 統計數字顏色 ──
+  function sc2(v,g,w){if(v==null)return'';return v>=g?'ok':v>=w?'mid':'low'}
+
+  // render
+  document.getElementById('rpt-content').innerHTML=`
+    <!-- 圖例 -->
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--c-nap)"></div>小睡時間</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--c-bed)"></div>躺床→入睡</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--c-sleep)"></div>睡著→醒來</div>
+    </div>
+
+    <!-- 甘特圖 -->
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:10px">睡眠日誌時間軸</h3>
+    <div class="gantt-wrap">
+      <div class="gantt-container">
+        ${axisHTML}
+        ${ganttRows}
+      </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <h3 style="font-size:14px;font-weight:700;margin:1.5rem 0 10px">睡眠統計摘要</h3>
+    <div class="stat-grid">
+      <div class="scard"><div class="sl">一週平均總睡眠</div><div class="sv ${sc2(stats.avgAll,660,600)}">${fmtDurH(stats.avgAll)}</div><div class="ss">平日 ${fmtDurH(stats.avgWD)} ／ 假日 ${fmtDurH(stats.avgHD)}</div></div>
+      <div class="scard"><div class="sl">平均夜間睡眠</div><div class="sv">${fmtDurH(stats.avgNightWD)}</div><div class="ss">平日 ／ 假日 ${fmtDurH(stats.avgNightHD)}</div></div>
+      <div class="scard"><div class="sl">平均小睡</div><div class="sv">${stats.avgNapWD!=null?fmtDurH(stats.avgNapWD):'無小睡紀錄'}</div><div class="ss">假日 ${stats.avgNapHD!=null?fmtDurH(stats.avgNapHD):'無小睡紀錄'}</div></div>
+      <div class="scard"><div class="sl">平均入睡時間（SOL）</div><div class="sv ${sc2(stats.avgSOL_WD!=null?40-stats.avgSOL_WD:null,30,20)}">${stats.avgSOL_WD!=null?Math.round(stats.avgSOL_WD)+'分':'—'}</div><div class="ss">假日 ${stats.avgSOL_HD!=null?Math.round(stats.avgSOL_HD)+'分':'—'}</div></div>
+      <div class="scard"><div class="sl">平均夜醒時間（WASO）</div><div class="sv">${stats.avgWASO_WD!=null?Math.round(stats.avgWASO_WD)+'分':'—'}</div><div class="ss">假日 ${stats.avgWASO_HD!=null?Math.round(stats.avgWASO_HD)+'分':'—'}</div></div>
+      <div class="scard"><div class="sl">睡眠效率</div><div class="sv ${avgEff!=null?(avgEff>=0.9?'ok':avgEff>=0.8?'mid':'low'):''}">${avgEff!=null?Math.round(avgEff*100)+'%':'—'}</div><div class="ss">夜間睡眠 ÷ 躺床時間</div></div>
+    </div>
+
+    <!-- 圖表區 -->
+    <h3 style="font-size:14px;font-weight:700;margin:1.5rem 0 10px">每日睡眠數據圖表</h3>
+    <div class="charts-grid">
+      <div class="chart-card wide">
+        <h4>每日睡眠時數（小時）</h4>
+        <canvas id="c-tst"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>每日入睡潛伏期 SOL（分鐘）</h4>
+        <canvas id="c-sol"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>每日夜醒時間 WASO（分鐘）</h4>
+        <canvas id="c-waso"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>每日睡眠效率（%）</h4>
+        <canvas id="c-eff"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>每日入睡品質評分</h4>
+        <canvas id="c-qual"></canvas>
+      </div>
+    </div>
+
+    <!-- 小結 -->
+    <div class="sum-box">
+      <h4>🐻 熊愛睏的睡眠小結</h4>
+      <p>${lines.join('<br>')}<span class="overall">${overall}</span></p>
+    </div>
+  `
+
+  // ── 繪製圖表（等 DOM 更新後）──
+  requestAnimationFrame(()=>{
+    // 睡眠時數（堆疊：夜間+小睡）
+    const cTST=new Chart(document.getElementById('c-tst'),{
+      type:'bar',
+      data:{
+        labels:dateLabels,
+        datasets:[
+          {label:'夜間睡眠',data:tst_n_data,backgroundColor:COLORS.sleep,stack:'s'},
+          {label:'小睡',data:nap_data,backgroundColor:COLORS.nap,stack:'s'}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:true,
+        plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}：${ctx.parsed.y}h`}}},
+        scales:{x:{ticks:{font:{size:10}},grid:{display:false},stacked:true},y:{beginAtZero:true,max:16,stacked:true,ticks:{font:{size:10},callback:v=>v+'h'},grid:{color:'#ece8e3'}}}
+      }
     })
-    renderTable(filtered)
-    document.getElementById('record-total').textContent = `顯示 ${filtered.length} / ${allLogs.length} 筆`
-  }
+    chartInstances.push(cTST)
 
-  // ── 工具函數 ──
-  function toMins(t) { if(!t)return null; const[h,m]=t.split(':').map(Number); return h*60+m }
-  function calcDur(s,w) { if(!s||!w)return null; let d=toMins(w)-toMins(s); if(d<0)d+=1440; return d }
-  function fmtDur(m) { if(m==null)return'—'; const h=Math.floor(m/60); const mm=m%60; return h+'h'+(mm?mm+'m':'') }
-  function fmtDurH(m) { if(m==null)return'—'; return (m/60).toFixed(1)+'h' }
+    const cSOL=new Chart(document.getElementById('c-sol'),chartCfg(dateLabels,[{label:'SOL',data:sol_data,backgroundColor:COLORS.sol}],'分',60))
+    const cWASO=new Chart(document.getElementById('c-waso'),chartCfg(dateLabels,[{label:'WASO',data:waso_data,backgroundColor:COLORS.waso}],'分',60))
+    const cEFF=new Chart(document.getElementById('c-eff'),chartCfg(dateLabels,[{label:'效率',data:eff_data,backgroundColor:COLORS.eff}],'%',100))
+    const cQUAL=new Chart(document.getElementById('c-qual'),chartCfg(dateLabels,[{label:'品質',data:qual_data,backgroundColor:COLORS.qual}],'分',5))
+    chartInstances.push(cSOL,cWASO,cEFF,cQUAL)
+  })
 
-  function napTotal(napJson) {
-    try {
-      const naps = JSON.parse(napJson)
-      if (!naps||!naps.length) return 0
-      return naps.reduce((acc, n) => {
-        const d = calcDur(n.start, n.end)
-        return acc + (d||0)
-      }, 0)
-    } catch { return 0 }
-  }
-
-  function napStr(napJson) {
-    try {
-      const naps = JSON.parse(napJson)
-      if (!naps||!naps.length) return '—'
-      return naps.map(n=>`${n.start}–${n.end}`).join(' ')
-    } catch { return '—' }
-  }
-
-  function wdLabel(v) { return { lt5:'5分內','5-10':'5–10分','10-15':'10–15分','15-20':'15–20分','20+':'20分以上'}[v]||v||'—' }
-  function wkLabel(v) { return { none:'未曾醒來','1-2':'醒1–2次','3+':'醒3次以上'}[v]||v }
-  function wkBadge(v) { return { none:'bo','1-2':'bw','3+':'bd'}[v]||'bg' }
-  function fishHTML(n) { return '🐟'.repeat(n)+'<span style="opacity:.2">'+'🐟'.repeat(5-n)+'</span>' }
-  function fmtDT(iso) { if(!iso)return'—'; const d=new Date(iso); return d.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})+' '+d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}) }
-
-  // waso: 把 wakeup_count + wake_duration 換算成分鐘
-  function wasoMins(log) {
-    if (log.wakeup_count === 'none') return 0
-    const dMap = { lt5: 3, '5-10': 7, '10-15': 12, '15-20': 17, '20+': 25 }
-    const perTime = dMap[log.wake_duration] || 0
-    const times = log.wakeup_count === '1-2' ? 1.5 : 4
-    return Math.round(perTime * times)
-  }
-
-  function renderTable(logs) {
-    const tb = document.getElementById('table-body')
-    if (!logs.length) { tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--hint);padding:2rem">沒有符合條件的記錄</td></tr>'; return }
-    tb.innerHTML = logs.map(l => {
-      const dur = calcDur(l.sleep_time, l.wake_time)
-      return `<tr>
-        <td class="nm">${l.name||'—'}</td>
-        <td class="tc"><strong>${l.date}</strong></td>
-        <td class="tc">${l.bed_time||'—'}</td>
-        <td class="tc">${l.sleep_time||'—'}</td>
-        <td class="tc">${l.wake_time||'—'}</td>
-        <td class="tc">${l.up_time||'—'}</td>
-        <td class="dc">${dur!=null?fmtDur(dur):'—'}</td>
-        <td class="dc">${l.naps?napStr(l.naps):'—'}</td>
-        <td><span class="badge ${wkBadge(l.wakeup_count)}">${wkLabel(l.wakeup_count)}</span></td>
-        <td class="dc">${wdLabel(l.wake_duration)}</td>
-        <td><span class="badge ${l.insomnia?'bd':'bo'}">${l.insomnia?'是':'否'}</span></td>
-        <td>${fishHTML(l.quality)}</td>
-        <td style="color:var(--hint);font-size:12px">${fmtDT(l.created_at)}</td>
-      </tr>`
-    }).join('')
-  }
-
-  function updateSummary(logs) {
-    document.getElementById('s-total').textContent = logs.length
-    const durs = logs.map(l=>calcDur(l.sleep_time,l.wake_time)).filter(v=>v!=null)
-    document.getElementById('s-sleep').textContent = durs.length ? (durs.reduce((a,b)=>a+b,0)/durs.length/60).toFixed(1) : '—'
-    if (logs.length) {
-      document.getElementById('s-quality').textContent = (logs.reduce((a,l)=>a+l.quality,0)/logs.length).toFixed(1)
-      document.getElementById('s-insomnia').textContent = Math.round(logs.filter(l=>l.insomnia).length/logs.length*100)+'%'
-    }
-  }
-
-  function exportCSV() {
-    if (!filtered.length) return
-    const hdrs = ['名字','日期','躺床','入睡','醒來','起床','睡眠時長(分)','小睡','中間醒來','醒來時長','難以再入睡','品質','填寫時間']
-    const rows = filtered.map(l => [
-      l.name||'', l.date, l.bed_time||'', l.sleep_time||'', l.wake_time||'', l.up_time||'',
-      calcDur(l.sleep_time,l.wake_time)||'',
-      l.naps?napStr(l.naps):'',
-      wkLabel(l.wakeup_count), wdLabel(l.wake_duration),
-      l.insomnia?'是':'否', l.quality, l.created_at||''
-    ])
-    const csv = [hdrs,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}))
-    a.download = `睡眠日誌_${new Date().toISOString().slice(0,10)}.csv`; a.click()
-  }
-
-  // ══════════════════════════════════════════
-  // 7日睡眠報告生成邏輯
-  // ══════════════════════════════════════════
-  async function generateReport() {
-    const name   = document.getElementById('rpt-name').value.trim()
-    const endStr = document.getElementById('rpt-end').value
-    if (!name || !endStr) { alert('請填寫名字與結束日期'); return }
-
-    // 計算7天範圍
-    const endDate = new Date(endStr)
-    const startDate = new Date(endDate)
-    startDate.setDate(startDate.getDate() - 6)
-    const startStr = startDate.toISOString().slice(0,10)
-
-    const { data, error } = await db.from('sleep_logs')
-      .select('*')
-      .eq('name', name)
-      .gte('date', startStr)
-      .lte('date', endStr)
-      .order('date', { ascending: true })
-
-    document.getElementById('no-report').style.display = 'none'
-    const out = document.getElementById('report-output')
-
-    if (error || !data || data.length === 0) {
-      out.style.display = 'none'
-      document.getElementById('no-report').style.display = 'block'
-      document.getElementById('no-report').innerHTML = `<p>找不到「${name}」在 ${startStr} 至 ${endStr} 的記錄</p>`
-      return
-    }
-
-    // ── 計算各項指標 ──
-    function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null }
-
-    const logs = data
-    const weekday = logs.filter(l => !isHoliday(l.date))
-    const holiday = logs.filter(l => isHoliday(l.date))
-
-    // 判斷假日：週六日
-    function isHoliday(dateStr) {
-      const d = new Date(dateStr); return d.getDay()===0||d.getDay()===6
-    }
-
-    // TIB：躺床總時間
-    function getTIB(l) { return calcDur(l.bed_time, l.up_time) }
-
-    // TST_N：夜間睡眠 = wake_time - sleep_time - WASO
-    function getTST_N(l) {
-      const base = calcDur(l.sleep_time, l.wake_time)
-      if (base==null) return null
-      return Math.max(0, base - wasoMins(l))
-    }
-
-    // TST_A：總睡眠 = 夜間 + 小睡
-    function getTST_A(l) {
-      const n = getTST_N(l); if(n==null)return null
-      return n + (l.naps ? napTotal(l.naps) : 0)
-    }
-
-    // SOL：入睡潛伏期
-    function getSOL(l) { return calcDur(l.bed_time, l.sleep_time) }
-
-    const allTST_A = logs.map(getTST_A).filter(v=>v!=null)
-    const wdTST_A  = weekday.map(getTST_A).filter(v=>v!=null)
-    const hdTST_A  = holiday.map(getTST_A).filter(v=>v!=null)
-    const wdTST_N  = weekday.map(getTST_N).filter(v=>v!=null)
-    const hdTST_N  = holiday.map(getTST_N).filter(v=>v!=null)
-    const wdNap    = weekday.map(l=>l.naps?napTotal(l.naps):0)
-    const hdNap    = holiday.map(l=>l.naps?napTotal(l.naps):0)
-    const wdWASO   = weekday.map(wasoMins)
-    const hdWASO   = holiday.map(wasoMins)
-    const wdSOL    = weekday.map(getSOL).filter(v=>v!=null)
-    const hdSOL    = holiday.map(getSOL).filter(v=>v!=null)
-    const wdTIB    = weekday.map(getTIB).filter(v=>v!=null)
-    const hdTIB    = holiday.map(getTIB).filter(v=>v!=null)
-
-    // 睡眠效率 = TST_N / TIB
-    function getEff(l) { const n=getTST_N(l); const t=getTIB(l); if(!n||!t||t===0)return null; return n/t }
-    const avgEff = avg(logs.map(getEff).filter(v=>v!=null))
-
-    // ── 生成小結文字 ──
-    function buildSummary(stats) {
-      const lines = []
-      const weekAvgH = stats.avgAll!=null ? stats.avgAll/60 : null
-
-      // 總睡眠評估
-      if (weekAvgH!=null) {
-        if (weekAvgH >= 11) lines.push('寶貝整體睡得充足，精神滿滿、足夠有活力。')
-        else if (weekAvgH >= 10) lines.push('寶貝整體睡得剛剛好，有不錯的精神狀態。')
-        else if (weekAvgH >= 9)  lines.push('寶貝整體睡得有點短，白天可能容易有些疲倦。')
-        else lines.push('寶貝整體睡眠時間明顯不足，需要特別留意。')
-      }
-
-      // 夜間睡眠
-      if (stats.avgNightAll!=null) {
-        const h = stats.avgNightAll/60
-        if (h >= 10)       lines.push('晚上睡得很充足，夜間休息品質良好。')
-        else if (h >= 9)   lines.push('晚上睡得還不錯，夜間有基本的休息。')
-        else if (h >= 8)   lines.push('晚上睡得有點短，醒著時比較容易有小脾氣。')
-        else               lines.push('夜間睡眠時間偏短，建議提早上床時間。')
-      }
-
-      // 小睡
-      if (stats.avgNapAll!=null) {
-        const h = stats.avgNapAll/60
-        if (h >= 1.5)      lines.push('小睡剛剛好，下午活力穩。')
-        else if (h >= 0.5) lines.push('小睡時間稍短，可視情況調整。')
-        else if (h > 0)    lines.push('小睡時間很少，白天可能需要多休息。')
-        // 無小睡不評論
-      }
-
-      // 夜醒
-      const insomniaRate = logs.filter(l=>l.insomnia).length / logs.length
-      const wakeRate = logs.filter(l=>l.wakeup_count!=='none').length / logs.length
-      if (wakeRate < 0.2)       lines.push('半夜幾乎不會醒，睡得很沉。')
-      else if (wakeRate < 0.5)  lines.push('偶爾會在夜間醒來，整體算平穩。')
-      else                      lines.push('夜間醒來的頻率較高，需要關注入睡環境。')
-
-      // SOL
-      if (stats.avgSOLAll!=null) {
-        const m = stats.avgSOLAll
-        if (m <= 20)      lines.push('入睡時間剛剛好，節奏自然又舒服。')
-        else if (m <= 30) lines.push('入睡需要稍微多一點時間，可嘗試睡前放鬆。')
-        else              lines.push('入睡較困難，建議評估睡眠習慣及環境。')
-      }
-
-      // 睡眠效率
-      if (avgEff!=null) {
-        if (avgEff >= 0.9)      lines.push('睡眠效率非常好，晚上能夠睡好睡滿，是小小睡眠冠軍。')
-        else if (avgEff >= 0.8) lines.push('睡眠效率不錯，躺床時間大部分都在睡覺。')
-        else                    lines.push('睡眠效率偏低，可能有較多在床上清醒的時間。')
-      }
-
-      // 規律性（檢查躺床時間標準差）
-      const bedTimes = logs.map(l=>toMins(l.bed_time)).filter(v=>v!=null)
-      if (bedTimes.length >= 4) {
-        const mean = avg(bedTimes)
-        const sd = Math.sqrt(avg(bedTimes.map(t=>(t-mean)**2)))
-        if (sd <= 30)       lines.push('上床睡覺和起床的時間都很規律。')
-        else if (sd <= 60)  lines.push('作息時間大致規律，週末和平日稍有差異。')
-        else                lines.push('上下床時間起伏較大，建議維持固定作息。')
-      }
-
-      // 整體評語
-      const score = (weekAvgH||0) + (avgEff||0)*2 + (wakeRate<0.3?1:0)
-      let overall = ''
-      if (score >= 13)     overall = '寶貝是睡得超棒的小小好眠大師喔！'
-      else if (score >= 11) overall = '寶貝的睡眠整體不錯，繼續保持好習慣！'
-      else if (score >= 9)  overall = '寶貝的睡眠還有進步空間，一起努力調整！'
-      else                  overall = '寶貝的睡眠需要多加關注，建議諮詢專業人員。'
-
-      return { lines, overall }
-    }
-
-    // ── 整理統計數字 ──
-    const stats = {
-      avgAll:      avg(allTST_A),
-      avgWD:       avg(wdTST_A),
-      avgHD:       avg(hdTST_A),
-      avgNightAll: avg([...wdTST_N,...hdTST_N]),
-      avgNightWD:  avg(wdTST_N),
-      avgNightHD:  avg(hdTST_N),
-      avgNapAll:   avg([...wdNap,...hdNap].filter(v=>v>0)),
-      avgNapWD:    avg(wdNap.filter(v=>v>0)),
-      avgNapHD:    avg(hdNap.filter(v=>v>0)),
-      avgWASO_WD:  avg(wdWASO),
-      avgWASO_HD:  avg(hdWASO),
-      avgSOLAll:   avg([...wdSOL,...hdSOL]),
-      avgSOL_WD:   avg(wdSOL),
-      avgSOL_HD:   avg(hdSOL),
-    }
-
-    const { lines, overall } = buildSummary(stats)
-
-    // ── 渲染 ──
-    document.getElementById('rpt-title').textContent = `${name} 的 7 日睡眠報告`
-    document.getElementById('rpt-sub').textContent = `${startStr} ～ ${endStr}（共 ${logs.length} 筆記錄）`
-
-    // 日誌表格
-    const dayNames = ['日','一','二','三','四','五','六']
-    document.getElementById('rpt-journal').innerHTML = `
-      <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">睡眠日誌</h3>
-      <div style="overflow-x:auto;margin-bottom:1.5rem">
-      <table class="journal-table">
-        <thead><tr>
-          <th>日期</th><th>假/平日</th><th>躺床</th><th>入睡</th>
-          <th>醒來</th><th>起床</th><th>睡眠時長</th>
-          <th>小睡</th><th>夜醒</th><th>難以再入睡</th><th>品質</th>
-        </tr></thead>
-        <tbody>
-        ${logs.map(l => {
-          const hol = isHoliday(l.date)
-          const d = new Date(l.date)
-          const dateLabel = `${l.date.slice(5)} (${dayNames[d.getDay()]})`
-          const dur = calcDur(l.sleep_time, l.wake_time)
-          return `<tr class="${hol?'holiday-row':''}">
-            <td class="day-col">${dateLabel}</td>
-            <td>${hol?'假日':'平日'}</td>
-            <td>${l.bed_time||'—'}</td>
-            <td>${l.sleep_time||'—'}</td>
-            <td>${l.wake_time||'—'}</td>
-            <td>${l.up_time||'—'}</td>
-            <td>${dur!=null?fmtDur(dur):'—'}</td>
-            <td style="font-size:12px">${l.naps?napStr(l.naps):'—'}</td>
-            <td>${wkLabel(l.wakeup_count)}</td>
-            <td>${l.insomnia?'是':'否'}</td>
-            <td>${'🐟'.repeat(l.quality)}</td>
-          </tr>`
-        }).join('')}
-        </tbody>
-      </table></div>`
-
-    function statClass(val, goodAbove, warnAbove) {
-      if (val==null) return ''
-      return val >= goodAbove ? 'ok' : val >= warnAbove ? 'mid' : 'low'
-    }
-
-    document.getElementById('rpt-analysis').innerHTML = `
-      <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">睡眠分析</h3>
-      <div class="analysis-grid">
-        <div class="analysis-card">
-          <h4>平均總睡眠時數</h4>
-          <div class="stat-row"><span class="stat-label">一週</span><span class="stat-val ${statClass(stats.avgAll,660,600)}">${fmtDurH(stats.avgAll)}</span></div>
-          <div class="stat-row"><span class="stat-label">平日</span><span class="stat-val">${fmtDurH(stats.avgWD)}</span></div>
-          <div class="stat-row"><span class="stat-label">假日</span><span class="stat-val">${fmtDurH(stats.avgHD)}</span></div>
-          <div style="font-size:11px;color:var(--hint);margin-top:8px">1–2歲建議 11–14h｜2–4歲建議 10–13h</div>
-        </div>
-        <div class="analysis-card">
-          <h4>平均夜間睡眠時數</h4>
-          <div class="stat-row"><span class="stat-label">平日</span><span class="stat-val">${fmtDurH(stats.avgNightWD)}</span></div>
-          <div class="stat-row"><span class="stat-label">假日</span><span class="stat-val">${fmtDurH(stats.avgNightHD)}</span></div>
-        </div>
-        <div class="analysis-card">
-          <h4>平均白日小睡時數</h4>
-          <div class="stat-row"><span class="stat-label">平日</span><span class="stat-val">${stats.avgNapWD!=null?fmtDurH(stats.avgNapWD):'無小睡'}</span></div>
-          <div class="stat-row"><span class="stat-label">假日</span><span class="stat-val">${stats.avgNapHD!=null?fmtDurH(stats.avgNapHD):'無小睡'}</span></div>
-        </div>
-        <div class="analysis-card">
-          <h4>平均躺多久才睡著（SOL）</h4>
-          <div class="stat-row"><span class="stat-label">平日</span><span class="stat-val ${statClass(stats.avgSOL_WD?600-stats.avgSOL_WD*10:null,580,560)}">${stats.avgSOL_WD!=null?Math.round(stats.avgSOL_WD)+'分':'—'}</span></div>
-          <div class="stat-row"><span class="stat-label">假日</span><span class="stat-val">${stats.avgSOL_HD!=null?Math.round(stats.avgSOL_HD)+'分':'—'}</span></div>
-        </div>
-        <div class="analysis-card">
-          <h4>平均入睡期間清醒時數（WASO）</h4>
-          <div class="stat-row"><span class="stat-label">平日</span><span class="stat-val">${stats.avgWASO_WD!=null?Math.round(stats.avgWASO_WD)+'分':'—'}</span></div>
-          <div class="stat-row"><span class="stat-label">假日</span><span class="stat-val">${stats.avgWASO_HD!=null?Math.round(stats.avgWASO_HD)+'分':'—'}</span></div>
-        </div>
-        <div class="analysis-card">
-          <h4>睡眠效率</h4>
-          <div class="stat-row"><span class="stat-label">一週平均</span><span class="stat-val ${avgEff!=null?(avgEff>=0.9?'ok':avgEff>=0.8?'mid':'low'):''}">${avgEff!=null?Math.round(avgEff*100)+'%':'—'}</span></div>
-          <div style="font-size:11px;color:var(--hint);margin-top:8px">夜間睡眠 ÷ 躺床總時間</div>
-        </div>
-      </div>`
-
-    document.getElementById('rpt-summary').innerHTML = `
-      <div class="summary-box">
-        <h4>小結</h4>
-        <p>${lines.join(' ')}<span class="overall">整體評語：${overall}</span></p>
-      </div>`
-
-    out.style.display = 'block'
-  }
+  out.style.display='block'
+  out.scrollIntoView({behavior:'smooth',block:'start'})
+}
 </script>
 </body>
 </html>
