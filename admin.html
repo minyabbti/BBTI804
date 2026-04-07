@@ -207,6 +207,20 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
   padding:8px 24px;font-size:10px;color:var(--hnt);text-align:center;
 }
 
+/* ── 編輯視窗的樣式 ── */
+.modal-overlay { display:none; position:fixed; z-index:999; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; padding:1rem; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:var(--sur); border-radius:var(--rl); padding:1.5rem; width:100%; max-width:320px; box-shadow:0 10px 25px rgba(0,0,0,0.1); }
+.modal-box h3 { font-size:16px; margin-bottom:4px; color:var(--brand); }
+.modal-desc { font-size:12px; color:var(--mut); margin-bottom:1rem; }
+.modal-box .rff { margin-bottom:10px; }
+.modal-box input[type="time"] { cursor:pointer; }
+.modal-btns { display:flex; gap:8px; margin-top:1.5rem; }
+.modal-btns button { flex:1; }
+
+/* 已校正的藍色小標籤 */
+.edit-badge { font-size:10px; background:#e8f0fe; color:#1a73e8; padding:2px 6px; border-radius:10px; margin-left:6px; font-weight:normal; }
+  
 @media(max-width:900px){
   .rpt-body{grid-template-columns:1fr}
   .rpt-left{border-right:none;border-bottom:1px solid var(--bdr)}
@@ -284,8 +298,9 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
             <th>名字</th><th>日期</th><th>躺床</th><th>入睡</th>
             <th>醒來</th><th>起床</th><th>睡眠時長</th><th>小睡</th>
             <th>中間醒來</th><th>醒來時長</th><th>難以再入睡</th><th>品質</th><th>填寫時間</th>
-          </tr></thead>
-          <tbody id="tbody"><tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr></tbody>
+            <th>操作</th> </tr></thead>
+          <tbody id="tbody">
+            <tr><td colspan="14" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr> </tbody>
         </table>
       </div>
     </div>
@@ -383,7 +398,8 @@ const ADMIN_PASSWORD = 'sleep804'
 const {createClient}=supabase
 const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY)
 let allLogs=[],filtered=[],histChart=null
-
+let editingId = null; // 👈 新增這行，用來記住現在正在改哪一筆
+  
 function doLogin(){
   if(document.getElementById('pwd').value===ADMIN_PASSWORD){
     document.getElementById('lw').style.display='none'
@@ -443,10 +459,17 @@ function getSE(l){const n=getTST_N(l);const t=getTIB(l);if(!n||!t||t===0)return 
 
 function renderTbl(logs){
   const tb=document.getElementById('tbody')
-  if(!logs.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">沒有符合條件的記錄</td></tr>';return}
+  if(!logs.length){tb.innerHTML='<tr><td colspan="14" style="text-align:center;color:var(--hnt);padding:2rem">沒有符合條件的記錄</td></tr>';return}
+  
   tb.innerHTML=logs.map(l=>{
     const dur=calcDur(l.sleep_time,l.wake_time)
-    return`<tr><td class="nm">${l.name||'—'}</td><td class="tc"><strong>${l.date}</strong></td>
+    
+    // 如果資料庫有 original_data，就顯示「已校正」標籤，滑鼠移過去會顯示原本填的時間
+    const editTag = l.original_data ? `<span class="edit-badge" title="原始: 躺${l.original_data.bed_time} 睡${l.original_data.sleep_time} 醒${l.original_data.wake_time} 起${l.original_data.up_time}">已校正</span>` : ''
+    
+    return`<tr>
+    <td class="nm">${l.name||'—'}${editTag}</td>
+    <td class="tc"><strong>${l.date}</strong></td>
     <td class="tc">${l.bed_time||'—'}</td><td class="tc">${l.sleep_time||'—'}</td>
     <td class="tc">${l.wake_time||'—'}</td><td class="tc">${l.up_time||'—'}</td>
     <td class="dc">${dur!=null?(Math.floor(dur/60)+'h'+(dur%60?dur%60+'m':'')):' —'}</td>
@@ -455,7 +478,9 @@ function renderTbl(logs){
     <td class="dc">${wdLbl(l.wake_duration)}</td>
     <td><span class="badge ${l.insomnia?'bd':'bo'}">${l.insomnia?'是':'否'}</span></td>
     <td>${fish(l.quality)}</td>
-    <td style="color:var(--hnt);font-size:12px">${fmtDT(l.created_at)}</td></tr>`
+    <td style="color:var(--hnt);font-size:12px">${fmtDT(l.created_at)}</td>
+    <td><button class="ib" style="padding:4px 8px;font-size:11px" onclick="openEditModal('${l.id}')">✏️</button></td>
+    </tr>`
   }).join('')
 }
 function updSum(logs){
@@ -680,6 +705,93 @@ async function genReport(){
   isr.style.display='block'
   isr.scrollIntoView({behavior:'smooth',block:'start'})
 }
+  <div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <h3>✏️ 校正睡眠時間</h3>
+    <p class="modal-desc" id="edit-desc">修改後將自動保留原始填寫紀錄</p>
+    
+    <div class="rff"><label>躺床時間</label><input type="time" id="edit-bed"></div>
+    <div class="rff"><label>入睡時間</label><input type="time" id="edit-sleep"></div>
+    <div class="rff"><label>醒來時間</label><input type="time" id="edit-wake"></div>
+    <div class="rff"><label>起床時間</label><input type="time" id="edit-up"></div>
+    
+    <div class="modal-btns">
+      <button class="ib" onclick="closeEditModal()">取消</button>
+      <button class="gbtn" id="save-edit-btn" onclick="saveEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+// ── 編輯紀錄功能 ──
+// 打開視窗
+function openEditModal(id) {
+  const log = allLogs.find(x => x.id === id); 
+  if (!log) return;
+  
+  editingId = id;
+  document.getElementById('edit-desc').textContent = `${log.name} - ${log.date} 的紀錄`;
+  
+  // 把原本錯誤的時間先填進輸入框裡
+  document.getElementById('edit-bed').value = log.bed_time || '';
+  document.getElementById('edit-sleep').value = log.sleep_time || '';
+  document.getElementById('edit-wake').value = log.wake_time || '';
+  document.getElementById('edit-up').value = log.up_time || '';
+  
+  document.getElementById('edit-modal').classList.add('active');
+}
+
+// 關閉視窗
+function closeEditModal() {
+  editingId = null;
+  document.getElementById('edit-modal').classList.remove('active');
+}
+
+// 儲存修改到資料庫
+async function saveEdit() {
+  if (!editingId) return;
+  const btn = document.getElementById('save-edit-btn');
+  btn.textContent = '儲存中...';
+  btn.disabled = true;
+
+  const log = allLogs.find(x => x.id === editingId);
+  const newBed = document.getElementById('edit-bed').value;
+  const newSleep = document.getElementById('edit-sleep').value;
+  const newWake = document.getElementById('edit-wake').value;
+  const newUp = document.getElementById('edit-up').value;
+
+  let updatePayload = {
+    bed_time: newBed,
+    sleep_time: newSleep,
+    wake_time: newWake,
+    up_time: newUp
+  };
+
+  // 核心邏輯：如果這筆資料還沒有被改過，就把「最初的錯誤版本」備份到 original_data 裡
+  if (!log.original_data) {
+    updatePayload.original_data = {
+      bed_time: log.bed_time,
+      sleep_time: log.sleep_time,
+      wake_time: log.wake_time,
+      up_time: log.up_time
+    };
+  }
+
+  // 寫入 Supabase
+  const { error } = await db.from('sleep_logs')
+    .update(updatePayload)
+    .eq('id', editingId);
+
+  if (error) {
+    alert('儲存失敗：' + error.message);
+  } else {
+    closeEditModal();
+    await loadData(); // 重新讀取最新的資料畫在畫面上
+  }
+  
+  btn.textContent = '儲存';
+  btn.disabled = false;
+}
+  
 </script>
 </body>
 </html>
