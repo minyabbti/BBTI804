@@ -141,7 +141,7 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
 .gantt-lbl .gw{font-size:9px;color:var(--hnt)}
 .gantt-bar{flex:1;position:relative;height:22px;background:#f0ece6;border-radius:3px;overflow:hidden}
 .gseg{position:absolute;top:0;height:100%}
-/* 品質/精神小點 */
+/* 品質小點 */
 .gantt-scores{display:flex;gap:4px;margin-left:6px;align-items:center;flex-shrink:0;min-width:48px}
 .gscore{font-size:10px;color:var(--mut);text-align:center;line-height:1}
 .gscore .gsl{font-size:9px;color:var(--hnt)}
@@ -162,8 +162,14 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
 .abar-ref{position:absolute;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.2)}
 
 /* 睡眠歷程折線圖 */
-.history-chart-wrap{position:relative;height:160px;width:100%;margin-top:10px}
-.history-chart-wrap canvas{width:100%!important;height:100%!important}
+.history-chart-wrap {
+  position: relative;
+  height: 240px; /* 從 160px 加高到 240px 給予充足空間 */
+  width: 100%;
+  margin-top: 10px;
+  padding-bottom: 15px; /* 底部加上留白，確保日期文字不被裁切 */
+}
+.history-chart-wrap canvas { width: 100% !important; height: 100% !important; }
 
 /* 右欄：評分 */
 .score-box{
@@ -282,7 +288,7 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
       <div class="sg">
         <div class="mc"><div class="ml">總筆數</div><div class="mv" id="st">—</div><div class="ms">份日誌</div></div>
         <div class="mc"><div class="ml">平均睡眠時數</div><div class="mv" id="ss">—</div><div class="ms">小時/晚</div></div>
-        <div class="mc"><div class="ml">平均入睡品質</div><div class="mv" id="sq">—</div><div class="ms">/ 5 分</div></div>
+        <div class="mc"><div class="ml">平均睡眠品質</div><div class="mv" id="sq">—</div><div class="ms">/ 5 分</div></div>
         <div class="mc"><div class="ml">難以再入睡比率</div><div class="mv" id="si">—</div><div class="ms">的記錄有此情形</div></div>
       </div>
       <div class="ctrl">
@@ -308,7 +314,7 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
           <thead><tr>
             <th>名字</th><th>日期</th><th>躺床</th><th>入睡</th>
             <th>醒來</th><th>起床</th><th>睡眠時長</th><th>小睡</th>
-            <th>中間醒來</th><th>醒來時長</th><th>難以再入睡</th><th>品質</th><th>填寫時間</th>
+            <th>中間醒來</th><th>醒來時長</th><th>難以再入睡</th><th>睡眠品質</th><th>填寫時間</th>
             <th>操作</th> </tr></thead>
           <tbody id="tbody">
             <tr><td colspan="14" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr> </tbody>
@@ -347,17 +353,16 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
             <div class="rpt-section-title">睡眠日誌 <span>前一天 → 今天</span></div>
             <div id="rpt-gantt"></div>
             <div class="gantt-legend">
-              <div class="gl-item"><div class="gl-dot" style="background:var(--c-relax)"></div>放鬆訓練</div>
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-bed)"></div>躺床準備入睡</div>
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-sleep)"></div>睡著時間</div>
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-nap)"></div>白日小睡</div>
-              <div class="gl-item" style="font-size:10px;color:var(--hnt)">品質／精神 欄位為填寫者自評（1–5）</div>
+              <div class="gl-item" style="font-size:10px;color:var(--hnt)">睡眠品質 欄位為填寫者自評（1–5）</div>
             </div>
 
-            <div class="rpt-section-title">睡眠分析 <span>TIB = TST + SOL + WASO</span></div>
+            <div class="rpt-section-title">睡眠分析</div>
             <div class="analysis-bars" id="rpt-abars"></div>
 
-            <div class="rpt-section-title">睡眠歷程記錄 <span>SE = (TST × 100) ÷ TIB</span></div>
+            <div class="rpt-section-title">睡眠歷程記錄</div>
             <div class="history-chart-wrap"><canvas id="c-hist"></canvas></div>
           </div>
 
@@ -518,7 +523,7 @@ function updSum(logs){
 }
 function exportCSV(){
   if(!filtered.length)return
-  const h=['名字','日期','躺床','入睡','醒來','起床','睡眠時長(分)','小睡','中間醒來','醒來時長','難以再入睡','品質','填寫時間']
+  const h=['名字','日期','躺床','入睡','醒來','起床','睡眠時長(分)','小睡','中間醒來','醒來時長','難以再入睡','睡眠品質','填寫時間']
   const rows=filtered.map(l=>[l.name||'',l.date,l.bed_time||'',l.sleep_time||'',l.wake_time||'',l.up_time||'',calcDur(l.sleep_time,l.wake_time)||'',l.naps?napStr(l.naps):'',wkLbl(l.wakeup_count),wdLbl(l.wake_duration),l.insomnia?'是':'否',l.quality,l.created_at||''])
   const csv=[h,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));a.download=`睡眠日誌_${new Date().toISOString().slice(0,10)}.csv`;a.click()
@@ -614,38 +619,35 @@ async function genReport(){
       </div>
       <div class="gantt-bar">${segs.join('')}</div>
       <div class="gantt-scores">
-        <div class="gscore"><div>${l.quality||'—'}</div><div class="gsl">品質</div></div>
-        <div class="gscore"><div>${l.spirit||'—'}</div><div class="gsl">精神</div></div>
+        <div class="gscore"><div>${l.quality||'—'}</div><div class="gsl">睡眠品質</div></div>
       </div>
     </div>`
   }).join('')
 
   document.getElementById('rpt-gantt').innerHTML=axisHTML+ganttRows
 
-  // ── 橫條圖 ──
-  function abar(label,sub,val,maxVal,unit,color,refPct){
-    if(val==null)return''
-    const pctFill=Math.min(val/maxVal*100,100).toFixed(1)
-    return`<div class="abar-row">
+// ── 橫條圖 ──
+  function abar(label, sub, valMins, maxHr, color, refPct){
+    if(valMins == null) return '';
+    const hrVal = valMins / 60; // 先轉成小時（純數字）
+    const pctFill = Math.min((hrVal / maxHr) * 100, 100).toFixed(1); // 計算 % 數就不會出錯了
+    
+    return `<div class="abar-row">
       <div class="abar-label"><div class="abl">${label}</div><div class="abs">${sub}</div></div>
       <div class="abar-track">
         <div class="abar-fill" style="width:${pctFill}%;background:${color}"></div>
-        ${refPct?`<div class="abar-ref" style="left:${refPct}%"></div>`:''}
+        ${refPct ? `<div class="abar-ref" style="left:${refPct}%"></div>` : ''}
       </div>
-      <div class="abar-val">${val}</div>
+      <div class="abar-val">${hrVal.toFixed(2)} hr</div>
     </div>`
   }
 
-  const avgTSTh=avgTST!=null?(avgTST/60).toFixed(2)+' hr':'—'
-  const avgTIBh=avgTIB!=null?(avgTIB/60).toFixed(2)+' hr':'—'
-  const avgSOLh=avgSOL!=null?(avgSOL/60).toFixed(2)+' hr':'—'
-  const avgWASOh=avgWASO!=null?(avgWASO/60).toFixed(2)+' hr':'—'
-
+  // 將原始的分鐘數直接傳入，並且拿掉多餘的字串變數
   document.getElementById('rpt-abars').innerHTML=
-    abar('總睡眠時間','TST',avgTSTh,12,'hr','#1e5b87',70)+
-    abar('躺床時間','TIB',avgTIBh,12,'hr','#5f9ec9',70)+
-    abar('睡眠潛伏時間','SOL',avgSOLh,1.2,'hr','#d9964a',58)+
-    abar('睡眠開始後清醒時間','WASO',avgWASOh,1.2,'hr','#c25a53',8)
+    abar('總睡眠時間','TST',avgTST,12,'#1e5b87',70)+
+    abar('躺床時間','TIB',avgTIB,12,'#5f9ec9',70)+
+    abar('睡眠潛伏時間','SOL',avgSOL,1.2,'#d9964a',58)+
+    abar('睡眠開始後清醒時間','WASO',avgWASO,1.2,'#c25a53',8);
 
   // ── 右欄評分 ──
   const se=avgSE!=null?avgSE.toFixed(1):'—'
@@ -677,7 +679,7 @@ async function genReport(){
   const avgQual=avg(logs.map(l=>l.quality))
   const insomniaRate=Math.round(logs.filter(l=>l.insomnia).length/logs.length*100)
   document.getElementById('rpt-other').innerHTML=`
-    <div class="other-r"><span class="on">平均入睡品質</span><span class="ov">${avgQual!=null?avgQual.toFixed(1)+' / 5':'—'}</span></div>
+    <div class="other-r"><span class="on">平均睡眠品質</span><span class="ov">${avgQual!=null?avgQual.toFixed(1)+' / 5':'—'}</span></div>
     <div class="other-r"><span class="on">難以再入睡比率</span><span class="ov">${insomniaRate}%</span></div>
     <div class="other-r"><span class="on">有小睡記錄天數</span><span class="ov">${napArr.filter(v=>v>0).length} 天</span></div>
   `
