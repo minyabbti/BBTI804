@@ -238,7 +238,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
 </head>
 <body>
 
-<!-- Login -->
 <div class="lw" id="lw">
   <div class="lc">
     <h1>🐻 後台管理</h1>
@@ -249,7 +248,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
   </div>
 </div>
 
-<!-- Dashboard -->
 <div class="dash" id="dash">
   <div class="topbar">
     <h1>🐻 熊愛睏後台</h1>
@@ -265,7 +263,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
     <button class="dtab" onclick="sw('report',this)">7日睡眠報告</button>
   </div>
 
-  <!-- 記錄頁 -->
   <div class="dp active" id="dp-data">
     <div class="mi">
       <div class="sg">
@@ -306,7 +303,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
     </div>
   </div>
 
-  <!-- 報告頁 -->
   <div class="dp" id="dp-report">
     <div class="mi">
       <div class="rform">
@@ -318,7 +314,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
         </div>
       </div>
 
-      <!-- InSleep 風格報告 -->
       <div class="insleep-report" id="isr">
 
         <div class="rpt-header">
@@ -333,7 +328,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
         <div class="rpt-info-bar" id="rpt-info-bar"></div>
 
         <div class="rpt-body">
-          <!-- 左欄 -->
           <div class="rpt-left">
 
             <div class="rpt-section-title">睡眠日誌 <span>前一天 → 今天</span></div>
@@ -353,7 +347,6 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
             <div class="history-chart-wrap"><canvas id="c-hist"></canvas></div>
           </div>
 
-          <!-- 右欄 -->
           <div class="rpt-right">
             <div class="score-box">
               <div class="score-name">熊愛睏評分</div>
@@ -388,6 +381,23 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
   </div>
 </div>
 
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <h3>✏️ 校正睡眠時間</h3>
+    <p class="modal-desc" id="edit-desc">修改後將自動保留原始填寫紀錄</p>
+    
+    <div class="rff"><label>躺床時間</label><input type="time" id="edit-bed"></div>
+    <div class="rff"><label>入睡時間</label><input type="time" id="edit-sleep"></div>
+    <div class="rff"><label>醒來時間</label><input type="time" id="edit-wake"></div>
+    <div class="rff"><label>起床時間</label><input type="time" id="edit-up"></div>
+    
+    <div class="modal-btns">
+      <button class="ib" onclick="closeEditModal()">取消</button>
+      <button class="gbtn" id="save-edit-btn" onclick="saveEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ====================================================
   // 🔧 Supabase 專案資訊
@@ -414,9 +424,9 @@ function logout(){document.getElementById('lw').style.display='flex';document.ge
 function sw(n,b){document.querySelectorAll('.dp').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.dtab').forEach(x=>x.classList.remove('active'));document.getElementById('dp-'+n).classList.add('active');b.classList.add('active')}
 
 async function loadData(){
-  document.getElementById('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr>'
+  document.getElementById('tbody').innerHTML='<tr><td colspan="14" style="text-align:center;color:var(--hnt);padding:2rem">載入中...</td></tr>'
   const{data,error}=await db.from('sleep_logs').select('*').order('date',{ascending:false})
-  if(error){document.getElementById('tbody').innerHTML=`<tr><td colspan="13" style="text-align:center;color:#a03030;padding:2rem">載入失敗：${error.message}</td></tr>`;return}
+  if(error){document.getElementById('tbody').innerHTML=`<tr><td colspan="14" style="text-align:center;color:#a03030;padding:2rem">載入失敗：${error.message}</td></tr>`;return}
   allLogs=data||[];applyF();updSum(allLogs)
 }
 function applyF(){
@@ -705,22 +715,6 @@ async function genReport(){
   isr.style.display='block'
   isr.scrollIntoView({behavior:'smooth',block:'start'})
 }
-  <div class="modal-overlay" id="edit-modal">
-  <div class="modal-box">
-    <h3>✏️ 校正睡眠時間</h3>
-    <p class="modal-desc" id="edit-desc">修改後將自動保留原始填寫紀錄</p>
-    
-    <div class="rff"><label>躺床時間</label><input type="time" id="edit-bed"></div>
-    <div class="rff"><label>入睡時間</label><input type="time" id="edit-sleep"></div>
-    <div class="rff"><label>醒來時間</label><input type="time" id="edit-wake"></div>
-    <div class="rff"><label>起床時間</label><input type="time" id="edit-up"></div>
-    
-    <div class="modal-btns">
-      <button class="ib" onclick="closeEditModal()">取消</button>
-      <button class="gbtn" id="save-edit-btn" onclick="saveEdit()">儲存</button>
-    </div>
-  </div>
-</div>
 
 // ── 編輯紀錄功能 ──
 // 打開視窗
