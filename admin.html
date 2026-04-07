@@ -162,8 +162,8 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
 .abar-ref{position:absolute;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.2)}
 
 /* 睡眠歷程折線圖 */
-.history-chart-wrap{margin-top:4px}
-.history-chart-wrap canvas{max-height:130px}
+.history-chart-wrap{position:relative;height:160px;width:100%;margin-top:10px}
+.history-chart-wrap canvas{width:100%!important;height:100%!important}
 
 /* 右欄：評分 */
 .score-box{
@@ -227,12 +227,26 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
   .sg{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:600px){.topbar,.dbnav{padding:0 1rem}.dp{padding:1.25rem 1rem}}
+
 @media print{
-  body{background:#fff}
-  .topbar,.dbnav,.rform,.rpt-print-btn,.ctrl,.ab{display:none!important}
-  .insleep-report{display:block!important;border:none}
-  .dp{padding:0!important}
-  .mi{max-width:100%}
+  @page { size: A4 portrait; margin: 0; } 
+  body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .topbar, .dbnav, .rform, .rpt-print-btn, .ctrl, .ab, .lw { display: none !important; }
+  .dp { padding: 0 !important; }
+  .mi { max-width: 100%; margin: 0; }
+  
+  .insleep-report {
+    display: block !important;
+    border: none;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 12mm;
+    box-sizing: border-box;
+  }
+  
+  .rpt-body { grid-template-columns: 1fr 280px !important; }
+  .rpt-left { border-right: 1px solid var(--bdr) !important; border-bottom: none !important; }
 }
 </style>
 </head>
@@ -408,7 +422,7 @@ const ADMIN_PASSWORD = 'sleep804'
 const {createClient}=supabase
 const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY)
 let allLogs=[],filtered=[],histChart=null
-let editingId = null; // 👈 新增這行，用來記住現在正在改哪一筆
+let editingId = null; 
   
 function doLogin(){
   if(document.getElementById('pwd').value===ADMIN_PASSWORD){
@@ -465,7 +479,7 @@ function getTIB(l){return calcDur(l.bed_time,l.up_time)}
 function getTST_N(l){const b=calcDur(l.sleep_time,l.wake_time);if(b==null)return null;return Math.max(0,b-wasoM(l))}
 function getTST_A(l){const n=getTST_N(l);if(n==null)return null;return n+(l.naps?napTotal(l.naps):0)}
 function getSOL(l){return calcDur(l.bed_time,l.sleep_time)}
-function getSE(l){const n=getTST_N(l);const t=getTIB(l);if(!n||!t||t===0)return null;return Math.round(n/t*100)}
+function getSE(l){const n=getTST_N(l);const t=getTIB(l);if(!n||!t||t===0)return null;return Math.min(Math.round(n/t*100), 100)}
 
 function renderTbl(logs){
   const tb=document.getElementById('tbody')
@@ -474,7 +488,7 @@ function renderTbl(logs){
   tb.innerHTML=logs.map(l=>{
     const dur=calcDur(l.sleep_time,l.wake_time)
     
-    // 如果資料庫有 original_data，就顯示「已校正」標籤，滑鼠移過去會顯示原本填的時間
+    // 原始數據標籤
     const editTag = l.original_data ? `<span class="edit-badge" title="原始: 躺${l.original_data.bed_time} 睡${l.original_data.sleep_time} 醒${l.original_data.wake_time} 起${l.original_data.up_time}">已校正</span>` : ''
     
     return`<tr>
@@ -544,7 +558,6 @@ async function genReport(){
   const avgSOL=avg(solArr)
   const avgWASO=avg(wasoArr)
 
-  // 歷程（前幾週的週平均 SE，這裡用單週資料模擬）
   const weekSE=avgSE!=null?avgSE.toFixed(1):'—'
 
   // ── Header ──
@@ -557,7 +570,7 @@ async function genReport(){
   `
 
   // ── 甘特圖 ──
-  const AXIS_S=18*60 // 從下午6點開始
+  const AXIS_S=18*60 
   const AXIS_T=24*60
   const hrs=[]
   for(let h=18;h<42;h++){const hh=h%24;hrs.push(hh===0?'午夜':hh<12?`${hh}時`:hh===12?'中午':`${hh}時`)}
@@ -565,26 +578,30 @@ async function genReport(){
   function pct(m){return((m-AXIS_S+AXIS_T)%AXIS_T/AXIS_T*100).toFixed(2)+'%'}
   function pw(m){return(m/AXIS_T*100).toFixed(2)+'%'}
 
-  // 軸標籤（每3小時）
   const axisHTML=`<div class="gantt-axis-row">${hrs.map((l,i)=>`<div class="gantt-axis-lbl" style="width:${100/24}%">${i%3===0?l:''}</div>`).join('')}</div>`
 
   const ganttRows=logs.map(l=>{
     const d=new Date(l.date),hol=isHol(l.date)
     const segs=[]
 
-    // 小睡（綠）
     try{const naps=JSON.parse(l.naps||'[]');if(Array.isArray(naps))naps.forEach(n=>{
       const s=toMins(n.start),e=toMins(n.end);if(s==null||e==null)return
       const sA=s<AXIS_S?s+AXIS_T:s;const dur=e>s?e-s:e+AXIS_T-s
       segs.push(`<div class="gseg" style="left:${pct(sA)};width:${pw(dur)};background:var(--c-nap)"></div>`)
     })}catch{}
 
-    // 躺床→入睡（棕）
+    if(l.relax_time && l.bed_time){
+      const r=toMins(l.relax_time), rA=r<AXIS_S?r+AXIS_T:r, relDur=calcDur(l.relax_time, l.bed_time)||0
+      if(relDur > 0 && relDur < 300) { 
+        segs.push(`<div class="gseg" style="left:${pct(rA)};width:${pw(relDur)};background:var(--c-relax)"></div>`)
+      }
+    }
+
     if(l.bed_time&&l.sleep_time){
       const b=toMins(l.bed_time),bA=b<AXIS_S?b+AXIS_T:b,sol=calcDur(l.bed_time,l.sleep_time)||0
       segs.push(`<div class="gseg" style="left:${pct(bA)};width:${pw(sol)};background:var(--c-bed)"></div>`)
     }
-    // 睡著→醒來（深藍）
+    
     if(l.sleep_time&&l.wake_time){
       const s=toMins(l.sleep_time),sA=s<AXIS_S?s+AXIS_T:s,tst=calcDur(l.sleep_time,l.wake_time)||0
       segs.push(`<div class="gseg" style="left:${pct(sA)};width:${pw(tst)};background:var(--c-sleep)"></div>`)
@@ -598,14 +615,14 @@ async function genReport(){
       <div class="gantt-bar">${segs.join('')}</div>
       <div class="gantt-scores">
         <div class="gscore"><div>${l.quality||'—'}</div><div class="gsl">品質</div></div>
+        <div class="gscore"><div>${l.spirit||'—'}</div><div class="gsl">精神</div></div>
       </div>
     </div>`
   }).join('')
 
   document.getElementById('rpt-gantt').innerHTML=axisHTML+ganttRows
 
-  // ── 橫條圖（對應 InSleep 的 TST/TIB/SOL/WASO 橫條）──
-  // 參考值範圍：TST 0-10hr, TIB 0-12hr, SOL 0-1.2hr, WASO 0-1.2hr
+  // ── 橫條圖 ──
   function abar(label,sub,val,maxVal,unit,color,refPct){
     if(val==null)return''
     const pctFill=Math.min(val/maxVal*100,100).toFixed(1)
@@ -625,10 +642,10 @@ async function genReport(){
   const avgWASOh=avgWASO!=null?(avgWASO/60).toFixed(2)+' hr':'—'
 
   document.getElementById('rpt-abars').innerHTML=
-    abar('總睡眠時間','TST',avgTSTh,12,'hr','#3a6b8a',70)+
-    abar('躺床時間','TIB',avgTIBh,12,'hr','#6b9ab8',70)+
-    abar('睡眠潛伏時間','SOL',avgSOLh,1.2,'hr','#c9a882',58)+
-    abar('睡眠開始後清醒時間','WASO',avgWASOh,1.2,'hr','#8a7060',8)
+    abar('總睡眠時間','TST',avgTSTh,12,'hr','#1e5b87',70)+
+    abar('躺床時間','TIB',avgTIBh,12,'hr','#5f9ec9',70)+
+    abar('睡眠潛伏時間','SOL',avgSOLh,1.2,'hr','#d9964a',58)+
+    abar('睡眠開始後清醒時間','WASO',avgWASOh,1.2,'hr','#c25a53',8)
 
   // ── 右欄評分 ──
   const se=avgSE!=null?avgSE.toFixed(1):'—'
@@ -696,12 +713,12 @@ async function genReport(){
         {label:'SE(%)',data:seData,borderColor:'#2c5f7a',backgroundColor:'rgba(44,95,122,.08)',tension:.3,yAxisID:'y1',borderWidth:2,pointRadius:4},
         {label:'TST(hr)',data:tstData,borderColor:'#3a6b8a',backgroundColor:'transparent',tension:.3,yAxisID:'y2',borderWidth:1.5,pointRadius:3,borderDash:[4,3]},
         {label:'TIB(hr)',data:tibData,borderColor:'#6b9ab8',backgroundColor:'transparent',tension:.3,yAxisID:'y2',borderWidth:1.5,pointRadius:3,borderDash:[2,3]},
-        {label:'SOL(hr)',data:solData,borderColor:'#c9a882',backgroundColor:'transparent',tension:.3,yAxisID:'y3',borderWidth:1.5,pointRadius:3},
-        {label:'WASO(hr)',data:wasoData,borderColor:'#8a7060',backgroundColor:'transparent',tension:.3,yAxisID:'y3',borderWidth:1.5,pointRadius:3,borderDash:[2,2]},
+        {label:'SOL(hr)',data:solData,borderColor:'#d9964a',backgroundColor:'transparent',tension:.3,yAxisID:'y3',borderWidth:1.5,pointRadius:3},
+        {label:'WASO(hr)',data:wasoData,borderColor:'#c25a53',backgroundColor:'transparent',tension:.3,yAxisID:'y3',borderWidth:1.5,pointRadius:3,borderDash:[2,2]},
       ]
     },
     options:{
-      responsive:true,maintainAspectRatio:true,
+      responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
       scales:{
         x:{ticks:{font:{size:9}},grid:{display:false}},
@@ -717,7 +734,6 @@ async function genReport(){
 }
 
 // ── 編輯紀錄功能 ──
-// 打開視窗
 function openEditModal(id) {
   const log = allLogs.find(x => x.id === id); 
   if (!log) return;
@@ -725,7 +741,6 @@ function openEditModal(id) {
   editingId = id;
   document.getElementById('edit-desc').textContent = `${log.name} - ${log.date} 的紀錄`;
   
-  // 把原本錯誤的時間先填進輸入框裡
   document.getElementById('edit-bed').value = log.bed_time || '';
   document.getElementById('edit-sleep').value = log.sleep_time || '';
   document.getElementById('edit-wake').value = log.wake_time || '';
@@ -734,13 +749,11 @@ function openEditModal(id) {
   document.getElementById('edit-modal').classList.add('active');
 }
 
-// 關閉視窗
 function closeEditModal() {
   editingId = null;
   document.getElementById('edit-modal').classList.remove('active');
 }
 
-// 儲存修改到資料庫
 async function saveEdit() {
   if (!editingId) return;
   const btn = document.getElementById('save-edit-btn');
@@ -760,7 +773,6 @@ async function saveEdit() {
     up_time: newUp
   };
 
-  // 核心邏輯：如果這筆資料還沒有被改過，就把「最初的錯誤版本」備份到 original_data 裡
   if (!log.original_data) {
     updatePayload.original_data = {
       bed_time: log.bed_time,
@@ -770,7 +782,6 @@ async function saveEdit() {
     };
   }
 
-  // 寫入 Supabase
   const { error } = await db.from('sleep_logs')
     .update(updatePayload)
     .eq('id', editingId);
@@ -779,13 +790,12 @@ async function saveEdit() {
     alert('儲存失敗：' + error.message);
   } else {
     closeEditModal();
-    await loadData(); // 重新讀取最新的資料畫在畫面上
+    await loadData(); 
   }
   
   btn.textContent = '儲存';
   btn.disabled = false;
 }
-  
 </script>
 </body>
 </html>
