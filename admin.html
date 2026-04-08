@@ -798,6 +798,8 @@ async function saveEdit(){
   const{error}=await db.from('sleep_logs').update(payload).eq('id',editingId)
   if(error){alert('儲存失敗：'+error.message)}else{closeEditModal();await loadData()}
   btn.textContent='儲存';btn.disabled=false
+}
+
 // ── PNG 匯出 ──
 async function exportPNG() {
   const el = document.getElementById('isr')
