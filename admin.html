@@ -632,6 +632,7 @@ async function genReport(){
   `
 
   // 甘特圖只顯示最後7天
+  const sortedLogs = [...logs].sort((a,b)=>a.date.localeCompare(b.date))
   const ganttLogs = sortedLogs.slice(-7)
   buildGantt(ganttLogs)
 
@@ -700,12 +701,7 @@ async function genReport(){
   document.getElementById('rpt-tip').textContent=buildTip()
 
   // ── 睡眠歷程折線圖（4週平均）──
-  // 把 28 天資料切成 4 週，每週算平均
-  // 第1週 = 最早的第1-7筆（依日期排序），第4週 = 最近的第22-28筆
-  // 若不足 28 天，有幾週算幾週
-
   // 先按日期排序（已是 ascending）
-  const sortedLogs = [...logs].sort((a,b)=>a.date.localeCompare(b.date))
 
   // 切週（每7天一組，從最早開始）
   const weeks = []
