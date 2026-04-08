@@ -12,7 +12,7 @@
 :root{
   --bg:#f5f4f1;--sur:#fff;--bdr:#e8e5e0;--bst:#ccc9c2;
   --txt:#1a1917;--mut:#6b6860;--hnt:#a8a59f;--r:10px;--rl:14px;
-  --c-nap:#7bbfaa;--c-bed:#d4a76a;--c-sleep:#3a6b8a;--c-relax:#e8c4a0;
+  --c-nap:#7bbfaa;--c-bed:#d4a76a;--c-sleep:#3a6b8a;--c-relax:#e8c4a0;--c-wake:#c8bdb0;
   --brand:#2c5f7a;
 }
 body{font-family:'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
@@ -319,6 +319,7 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
             <div class="gantt-legend">
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-bed)"></div>躺床準備入睡</div>
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-sleep)"></div>睡著時間</div>
+              <div class="gl-item"><div class="gl-dot" style="background:var(--c-wake)"></div>醒來至起床</div>
               <div class="gl-item"><div class="gl-dot" style="background:var(--c-nap)"></div>白日小睡</div>
               <div class="gl-item" style="font-size:10px;color:var(--hnt)">睡眠品質 欄位為填寫者自評（1–5）</div>
             </div>
@@ -368,9 +369,8 @@ tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)}
 
 <script>
 // ====================================================
-  // 🔧 Supabase 專案資訊
-  const SUPABASE_URL = 'https://wxdyrowwzdptktdravpb.supabase.co'
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZHlyb3d3emRwdGt0ZHJhdnBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQwMzgsImV4cCI6MjA5MDU1MDAzOH0.G_v_X_aU8QCu5baa3PqktYAMniVzMIcDqpBuZEO_uFQ'
+const SUPABASE_URL = 'https://wxdyrowwzdptktdravpb.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZHlyb3d3emRwdGt0ZHJhdnBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQwMzgsImV4cCI6MjA5MDU1MDAzOH0.G_v_X_aU8QCu5baa3PqktYAMniVzMIcDqpBuZEO_uFQ'
 const ADMIN_PASSWORD = 'sleep804'
 // ====================================================
 const {createClient}=supabase
@@ -560,6 +560,17 @@ function buildGantt(logs) {
         const left = gPct(s).toFixed(3)
         const width = gW(tst).toFixed(3)
         bars.push(`<div class="gantt-bar" style="left:${left}%;width:${width}%;background:var(--c-sleep)"></div>`)
+      }
+    }
+
+    // 醒來→起床（灰棕，夜間清醒段）
+    if (l.wake_time && l.up_time) {
+      const w = toMins(l.wake_time)
+      const dur = calcDur(l.wake_time, l.up_time) || 0
+      if (dur > 0 && dur < 300) {
+        const left = gPct(w).toFixed(3)
+        const width = gW(dur).toFixed(3)
+        bars.push(`<div class="gantt-bar" style="left:${left}%;width:${width}%;background:var(--c-wake);opacity:0.85"></div>`)
       }
     }
 
