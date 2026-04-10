@@ -465,13 +465,24 @@ tr:hover td{background:rgba(30,77,102,.03)}
 
 <!-- Modal -->
 <div class="modal-overlay" id="edit-modal">
-  <div class="modal-box">
-    <h3>✏️ 校正睡眠時間</h3>
+  <div class="modal-box" style="max-width:380px">
+    <h3>✏️ 校正紀錄</h3>
     <p class="modal-desc" id="edit-desc">修改後將自動保留原始填寫紀錄</p>
-    <div class="rff"><label>躺床時間</label><input type="time" id="edit-bed"></div>
-    <div class="rff"><label>入睡時間</label><input type="time" id="edit-sleep"></div>
-    <div class="rff"><label>醒來時間</label><input type="time" id="edit-wake"></div>
-    <div class="rff"><label>起床時間</label><input type="time" id="edit-up"></div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">睡眠時間</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="rff"><label>躺床</label><input type="time" id="edit-bed"></div>
+      <div class="rff"><label>入睡</label><input type="time" id="edit-sleep"></div>
+      <div class="rff"><label>醒來</label><input type="time" id="edit-wake"></div>
+      <div class="rff"><label>起床</label><input type="time" id="edit-up"></div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">
+      小睡記錄
+      <button onclick="addEditNap()" style="margin-left:8px;padding:2px 10px;border:1.5px solid var(--bdr);border-radius:8px;background:transparent;font-size:11px;font-family:inherit;cursor:pointer;color:var(--mut)">＋ 新增</button>
+    </div>
+    <div id="edit-nap-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+
     <div class="modal-btns">
       <button class="ib" onclick="closeEditModal()">取消</button>
       <button class="gbtn" id="save-edit-btn" onclick="saveEdit()">儲存</button>
@@ -885,17 +896,56 @@ async function genReport(){
 }
 
 // ── 編輯功能 ──
+let editNapCount = 0
+
 function openEditModal(id){
   const log=allLogs.find(x=>x.id===id);if(!log)return
   editingId=id
-  document.getElementById('edit-desc').textContent=`${log.name} - ${log.date} 的紀錄`
+  document.getElementById('edit-desc').textContent=`${log.name}・${log.date}`
   document.getElementById('edit-bed').value=log.bed_time||''
   document.getElementById('edit-sleep').value=log.sleep_time||''
   document.getElementById('edit-wake').value=log.wake_time||''
   document.getElementById('edit-up').value=log.up_time||''
+
+  // 載入小睡
+  editNapCount=0
+  const napList=document.getElementById('edit-nap-list')
+  napList.innerHTML=''
+  try{
+    const naps=JSON.parse(log.naps||'[]')
+    if(Array.isArray(naps)) naps.forEach(n=>addEditNap(n.start,n.end))
+  }catch{}
+
   document.getElementById('edit-modal').classList.add('active')
 }
+
+function addEditNap(start='',end=''){
+  editNapCount++
+  const id=editNapCount
+  const div=document.createElement('div')
+  div.id='edit-nap-'+id
+  div.style.cssText='display:flex;align-items:center;gap:8px;background:#f8f6f3;border-radius:10px;padding:8px 10px'
+  div.innerHTML=`
+    <div class="rff" style="flex:1"><label>開始</label><input type="time" id="en-s-${id}" value="${start}"></div>
+    <div class="rff" style="flex:1"><label>結束</label><input type="time" id="en-e-${id}" value="${end}"></div>
+    <button onclick="document.getElementById('edit-nap-${id}').remove()" style="padding:4px 8px;border:1.5px solid var(--bdr);border-radius:8px;background:transparent;cursor:pointer;color:var(--hnt);font-size:14px;flex-shrink:0;align-self:flex-end;margin-bottom:1px">✕</button>
+  `
+  document.getElementById('edit-nap-list').appendChild(div)
+}
+
+function getEditNaps(){
+  const naps=[]
+  document.querySelectorAll('#edit-nap-list > div').forEach(div=>{
+    const id=div.id.replace('edit-nap-','')
+    const s=document.getElementById('en-s-'+id)?.value
+    const e=document.getElementById('en-e-'+id)?.value
+    if(s&&e) naps.push({start:s,end:e})
+  })
+  return naps
+}
+
 function closeEditModal(){editingId=null;document.getElementById('edit-modal').classList.remove('active')}
+
 async function saveEdit(){
   if(!editingId)return
   const btn=document.getElementById('save-edit-btn');btn.textContent='儲存中...';btn.disabled=true
@@ -904,8 +954,18 @@ async function saveEdit(){
   const newSleep=document.getElementById('edit-sleep').value
   const newWake=document.getElementById('edit-wake').value
   const newUp=document.getElementById('edit-up').value
-  let payload={bed_time:newBed,sleep_time:newSleep,wake_time:newWake,up_time:newUp}
-  if(!log.original_data){payload.original_data={bed_time:log.bed_time,sleep_time:log.sleep_time,wake_time:log.wake_time,up_time:log.up_time}}
+  const newNaps=getEditNaps()
+  let payload={
+    bed_time:newBed,sleep_time:newSleep,wake_time:newWake,up_time:newUp,
+    naps:newNaps.length>0?JSON.stringify(newNaps):null
+  }
+  if(!log.original_data){
+    payload.original_data={
+      bed_time:log.bed_time,sleep_time:log.sleep_time,
+      wake_time:log.wake_time,up_time:log.up_time,
+      naps:log.naps||null
+    }
+  }
   const{error}=await db.from('sleep_logs').update(payload).eq('id',editingId)
   if(error){alert('儲存失敗：'+error.message)}else{closeEditModal();await loadData()}
   btn.textContent='儲存';btn.disabled=false
