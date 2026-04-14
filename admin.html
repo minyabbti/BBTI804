@@ -418,10 +418,10 @@ tr:hover td{background:rgba(30,77,102,.03)}
         <div class="rpt-header">
           <div>
             <div class="rpt-logo"><span class="rpt-logo-emoji">🐻</span> 熊愛睏 <span style="font-size:13px;opacity:.7;font-weight:400">睡眠報告</span></div>
-            <div class="rpt-logo-sub">InSleep </div>
+            <div class="rpt-logo-sub">InSleep · 睡眠行為科學分析</div>
           </div>
           <div id="rpt-name-badge" class="rpt-name-badge"></div>
-          <button class="rpt-print-btn" id="export-png-btn" onclick="exportPNG()">📥 儲存PNG</button>
+          <button class="rpt-print-btn" id="export-png-btn" onclick="exportPNG()">📥 儲存 PNG</button>
         </div>
         <div class="rpt-info-bar" id="rpt-info-bar"></div>
         <div class="rpt-body">
@@ -571,7 +571,10 @@ function renderTbl(logs){
     <td><span class="badge ${l.insomnia?'bd':'bo'}">${l.insomnia?'是':'否'}</span></td>
     <td>${fish(l.quality)}</td>
     <td style="color:var(--hnt);font-size:12px">${fmtDT(l.created_at)}</td>
-    <td><button class="ib" style="padding:4px 8px;font-size:11px" onclick="openEditModal('${l.id}')">✏️</button></td>
+    <td style="display:flex;gap:4px">
+      <button class="ib" style="padding:4px 8px;font-size:11px" onclick="openEditModal('${l.id}')">✏️</button>
+      <button class="ib" style="padding:4px 8px;font-size:11px;color:#b03030;border-color:#f0c0c0" onclick="deleteLog('${l.id}','${l.name}','${l.date}')">🗑</button>
+    </td>
     </tr>`
   }).join('')
 }
@@ -684,6 +687,11 @@ function buildGantt(logs) {
         const width = gW(tst).toFixed(3)
         bars.push(`<div class="gantt-bar" style="left:${left}%;width:${width}%;background:var(--c-sleep)"></div>`)
       }
+    }
+
+    // 時間資料不完整時顯示提示
+    if (!l.sleep_time || !l.wake_time) {
+      bars.push(`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:var(--hnt);white-space:nowrap">時間未填寫</div>`)
     }
 
     // 醒來→起床（灰棕，夜間清醒段）
@@ -971,7 +979,13 @@ async function saveEdit(){
   btn.textContent='儲存';btn.disabled=false
 }
 
-// ── PNG 匯出 ──
+// ── 刪除功能 ──
+async function deleteLog(id, name, date) {
+  if (!confirm(`確定要刪除「${name}」${date} 的記錄？\n此操作無法復原。`)) return
+  const { error } = await db.from('sleep_logs').delete().eq('id', id)
+  if (error) { alert('刪除失敗：' + error.message); return }
+  await loadData()
+}
 async function exportPNG() {
   const el = document.getElementById('isr')
   const btn = document.getElementById('export-png-btn')
