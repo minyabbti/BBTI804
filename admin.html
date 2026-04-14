@@ -558,7 +558,7 @@ function renderTbl(logs){
   if(!logs.length){tb.innerHTML='<tr><td colspan="14" style="text-align:center;color:var(--hnt);padding:2rem">沒有符合條件的記錄</td></tr>';return}
   tb.innerHTML=logs.map(l=>{
     const dur=calcDur(l.sleep_time,l.wake_time)
-    const isAnomaly = dur != null && (dur > 720 || dur < 60)  // 超過12小時或不足1小時
+    const isAnomaly = dur != null && (dur > 23*60 || (dur < 30 && l.sleep_time && l.wake_time))
     const editTag=l.original_data?`<span class="edit-badge" title="原始: 躺${l.original_data.bed_time} 睡${l.original_data.sleep_time} 醒${l.original_data.wake_time} 起${l.original_data.up_time}">已校正</span>`:''
     const anomalyTag=isAnomaly?`<span class="edit-badge" style="background:#fff0e8;color:#c05010" title="睡眠時長異常，建議校正">⚠️ 異常</span>`:''
     return`<tr>
