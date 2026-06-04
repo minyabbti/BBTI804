@@ -753,12 +753,27 @@ async function genReport(){
   if(!startStr||!endStr){ alert('請選擇起始與結束日期'); return }
   if(startStr > endStr) { alert('起始日期不能晚於結束日期'); return }
 
-  // 查詢嚴格依使用者指定的日期區間，不自動推算，避免抓到其他週
+  // ── 查詢1：報告區間（使用者指定的7天）──
+  // 用於甘特圖、統計數字、SE 計算
   const{data,error}=await db.from('sleep_logs')
     .select('*')
     .eq('name',name)
-    .gte('date',startStr)   // >= 起始日期
-    .lte('date',endStr)     // <= 結束日期
+    .gte('date',startStr)
+    .lte('date',endStr)
+    .order('date',{ascending:true})
+
+  // ── 查詢2：折線圖用的完整28天（結束日期往前推27天）──
+  // 讓折線圖能顯示前幾週趨勢，做分週比較
+  const histEndD   = new Date(endStr)
+  const histStartD = new Date(histEndD)
+  histStartD.setDate(histStartD.getDate() - 27)
+  const histStartStr = histStartD.toISOString().slice(0,10)
+
+  const{data:histData, error:histError}=await db.from('sleep_logs')
+    .select('*')
+    .eq('name',name)
+    .gte('date',histStartStr)   // 結束日往前28天
+    .lte('date',endStr)
     .order('date',{ascending:true})
 
   document.getElementById('norpt').style.display='none'
@@ -770,7 +785,8 @@ async function genReport(){
   }
   if(histChart){histChart.destroy();histChart=null}
 
-  const logs=data
+  const logs     = data                          // 報告區間 7 天
+  const allLogs28 = histData || data             // 折線圖用最多28天
   const tstArr=logs.map(getTST_N).filter(v=>v!=null)
   const tibArr=logs.map(getTIB).filter(v=>v!=null)
   const solArr=logs.map(getSOL).filter(v=>v!=null)
@@ -790,15 +806,16 @@ async function genReport(){
 
   document.getElementById('rpt-name-badge').textContent=`【${name}】`
   document.getElementById('rpt-info-bar').innerHTML=`
-    <div class="rpt-info-item"><div class="il">檢測日期</div><div class="iv">${startStr} ～ ${endStr}</div></div>
-    <div class="rpt-info-item"><div class="il">記錄筆數</div><div class="iv">${logs.length} 筆</div></div>
-    <div class="rpt-info-item"><div class="il">涵蓋週數</div><div class="iv">${Math.ceil(logs.length/7)} 週</div></div>
+    <div class="rpt-info-item"><div class="il">報告區間</div><div class="iv">${startStr} ～ ${endStr}</div></div>
+    <div class="rpt-info-item"><div class="il">本週記錄</div><div class="iv">${logs.length} 筆</div></div>
+    <div class="rpt-info-item"><div class="il">趨勢圖涵蓋</div><div class="iv">${histStartStr} ～ ${endStr}</div></div>
     <div class="rpt-info-item"><div class="il">平日 / 假日</div><div class="iv">${logs.filter(l=>!isHol(l.date)).length} / ${logs.filter(l=>isHol(l.date)).length} 天</div></div>
   `
 
-  // 甘特圖只顯示最後7天
-  const sortedLogs = [...logs].sort((a,b)=>a.date.localeCompare(b.date))
-  const ganttLogs = sortedLogs.slice(-7)
+  // 甘特圖只顯示報告區間（使用者指定的7天）
+  const sortedLogs   = [...logs].sort((a,b)=>a.date.localeCompare(b.date))       // 報告7天
+  const sortedAll28  = [...allLogs28].sort((a,b)=>a.date.localeCompare(b.date))   // 折線圖最多28天
+  const ganttLogs    = sortedLogs.slice(-7)
   buildGantt(ganttLogs)
 
   // 橫條圖
@@ -875,7 +892,7 @@ async function genReport(){
   let histMode = 'week'
 
   // 預先計算兩種資料，切換時直接用
-  // --- 模式A：本週每日（sortedLogs 最後7筆）---
+  // --- 模式A：本週每日（報告區間7天）---
   const weekLogs = sortedLogs.slice(-7)
   const dayLabels = weekLogs.map(l => {
     const d = new Date(l.date)
@@ -887,10 +904,10 @@ async function genReport(){
   const daySOL  = weekLogs.map(l => { const v=getSOL(l);   return v!=null?parseFloat((v/60).toFixed(2)):null })
   const dayWASO = weekLogs.map(l => parseFloat((wasoM(l)/60).toFixed(2)))
 
-  // --- 模式B：整段週平均 ---
+  // --- 模式B：整段週平均（最多28天，依結束日往前推）---
   const weeks = [], weekLabels = []
   for (let w = 0; w < 4; w++) {
-    const chunk = sortedLogs.slice(w * 7, w * 7 + 7)
+    const chunk = sortedAll28.slice(w * 7, w * 7 + 7)
     if (chunk.length === 0) break
     weeks.push(chunk)
     const from = chunk[0].date.slice(5), to = chunk[chunk.length-1].date.slice(5)
