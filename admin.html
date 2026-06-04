@@ -447,7 +447,13 @@ tr:hover td{background:rgba(30,77,102,.03)}
             </div>
             <div class="rpt-section-title">睡眠分析</div>
             <div class="analysis-bars" id="rpt-abars"></div>
-            <div class="rpt-section-title">睡眠歷程記錄 <span>4 週平均趨勢</span></div>
+            <div class="rpt-section-title">睡眠歷程記錄
+              <span id="hist-mode-label">4 週平均趨勢</span>
+              <span style="margin-left:auto;display:flex;gap:4px">
+                <button id="hist-btn-week" onclick="switchHistMode('week')" style="padding:2px 8px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;font-size:10px;cursor:pointer;font-family:inherit">本週每日</button>
+                <button id="hist-btn-all" onclick="switchHistMode('all')" style="padding:2px 8px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--mut);font-size:10px;cursor:pointer;font-family:inherit">整段週平均</button>
+              </span>
+            </div>
             <div class="history-chart-wrap"><canvas id="c-hist"></canvas></div>
           </div>
           <div class="rpt-right">
@@ -864,70 +870,98 @@ async function genReport(){
   }
   document.getElementById('rpt-tip').textContent=buildTip()
 
-  // ── 睡眠歷程折線圖（4週平均）──
-  // 先按日期排序（已是 ascending）
+  // ── 睡眠歷程折線圖（支援兩種模式）──
+  // histMode='week'：本週每日一點；histMode='all'：整段4週平均
+  let histMode = 'week'
 
-  // 切週（每7天一組，從最早開始）
-  const weeks = []
-  const weekLabels = []
+  // 預先計算兩種資料，切換時直接用
+  // --- 模式A：本週每日（sortedLogs 最後7筆）---
+  const weekLogs = sortedLogs.slice(-7)
+  const dayLabels = weekLogs.map(l => {
+    const d = new Date(l.date)
+    return `${l.date.slice(5)}(${DAY[d.getDay()]})`
+  })
+  const daySE   = weekLogs.map(l => { const n=getTST_N(l),t=getTIB(l); return(n!=null&&t&&t>0)?Math.min(Math.round(n/t*100),100):null })
+  const dayTST  = weekLogs.map(l => { const v=getTST_N(l); return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const dayTIB  = weekLogs.map(l => { const v=getTIB(l);   return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const daySOL  = weekLogs.map(l => { const v=getSOL(l);   return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const dayWASO = weekLogs.map(l => parseFloat((wasoM(l)/60).toFixed(2)))
+
+  // --- 模式B：整段週平均 ---
+  const weeks = [], weekLabels = []
   for (let w = 0; w < 4; w++) {
     const chunk = sortedLogs.slice(w * 7, w * 7 + 7)
     if (chunk.length === 0) break
     weeks.push(chunk)
-    // 標籤：第幾週 + 日期範圍
-    const from = chunk[0].date.slice(5)
-    const to   = chunk[chunk.length-1].date.slice(5)
+    const from = chunk[0].date.slice(5), to = chunk[chunk.length-1].date.slice(5)
     weekLabels.push(`第${w+1}週\n${from}～${to}`)
   }
-
   function weekAvg(chunk, fn) {
     const vals = chunk.map(fn).filter(v => v != null)
     return vals.length ? avg(vals) : null
   }
+  const wSE   = weeks.map(c => { const v=weekAvg(c, l=>{ const n=getTST_N(l),t=getTIB(l); return(n!=null&&t&&t>0)?Math.min(Math.round(n/t*100),100):null }); return v!=null?parseFloat(v.toFixed(1)):null })
+  const wTST  = weeks.map(c => { const v=weekAvg(c,getTST_N); return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const wTIB  = weeks.map(c => { const v=weekAvg(c,getTIB);   return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const wSOL  = weeks.map(c => { const v=weekAvg(c,getSOL);   return v!=null?parseFloat((v/60).toFixed(2)):null })
+  const wWASO = weeks.map(c => { const v=weekAvg(c,wasoM);    return v!=null?parseFloat((v/60).toFixed(2)):null })
 
-  const wSE   = weeks.map(c => { const v=weekAvg(c,getSE);   return v!=null?parseFloat(v.toFixed(1)):null })
-  const wTST  = weeks.map(c => { const v=weekAvg(c,getTST_N);return v!=null?parseFloat((v/60).toFixed(2)):null })
-  const wTIB  = weeks.map(c => { const v=weekAvg(c,getTIB);  return v!=null?parseFloat((v/60).toFixed(2)):null })
-  const wSOL  = weeks.map(c => { const v=weekAvg(c,getSOL);  return v!=null?parseFloat((v/60).toFixed(2)):null })
-  const wWASO = weeks.map(c => { const v=weekAvg(c,wasoM);   return v!=null?parseFloat((v/60).toFixed(2)):null })
-
-  histChart=new Chart(document.getElementById('c-hist'),{
-    type:'line',
-    data:{
-      labels: weekLabels,
-      datasets:[
-        {label:'SE(%)', data:wSE,   borderColor:'#2c5f7a',backgroundColor:'rgba(44,95,122,.08)',tension:.4,yAxisID:'y1',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,fill:true},
-        {label:'TST(hr)',data:wTST, borderColor:'#3a6b8a',backgroundColor:'transparent',tension:.4,yAxisID:'y2',borderWidth:1.8,pointRadius:4,borderDash:[5,3]},
-        {label:'TIB(hr)',data:wTIB, borderColor:'#6b9ab8',backgroundColor:'transparent',tension:.4,yAxisID:'y2',borderWidth:1.8,pointRadius:4,borderDash:[2,3]},
-        {label:'SOL(hr)',data:wSOL, borderColor:'#d9964a',backgroundColor:'transparent',tension:.4,yAxisID:'y3',borderWidth:1.8,pointRadius:4},
-        {label:'WASO(hr)',data:wWASO,borderColor:'#c25a53',backgroundColor:'transparent',tension:.4,yAxisID:'y3',borderWidth:1.8,pointRadius:4,borderDash:[2,2]},
-      ]
+  // 共用 chart config
+  const chartDatasets = (SE, TST, TIB, SOL, WASO) => ([
+    {label:'SE(%)', data:SE,   borderColor:'#2c5f7a',backgroundColor:'rgba(44,95,122,.08)',tension:.4,yAxisID:'y1',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,fill:true},
+    {label:'TST(hr)',data:TST, borderColor:'#3a6b8a',backgroundColor:'transparent',tension:.4,yAxisID:'y2',borderWidth:1.8,pointRadius:4,borderDash:[5,3]},
+    {label:'TIB(hr)',data:TIB, borderColor:'#6b9ab8',backgroundColor:'transparent',tension:.4,yAxisID:'y2',borderWidth:1.8,pointRadius:4,borderDash:[2,3]},
+    {label:'SOL(hr)',data:SOL, borderColor:'#d9964a',backgroundColor:'transparent',tension:.4,yAxisID:'y3',borderWidth:1.8,pointRadius:4},
+    {label:'WASO(hr)',data:WASO,borderColor:'#c25a53',backgroundColor:'transparent',tension:.4,yAxisID:'y3',borderWidth:1.8,pointRadius:4,borderDash:[2,2]},
+  ])
+  const chartOptions = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{labels:{font:{size:10},boxWidth:10}},
+      tooltip:{callbacks:{
+        title: ctx => ctx[0].label.replace('\n',' '),
+        label: ctx => `${ctx.dataset.label}：${ctx.parsed.y ?? '—'}`
+      }}
     },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{
-        legend:{labels:{font:{size:10},boxWidth:10}},
-        tooltip:{
-          callbacks:{
-            title: ctx => ctx[0].label.replace('\n',' '),
-            label: ctx => `${ctx.dataset.label}：${ctx.parsed.y ?? '—'}`
-          }
-        }
-      },
-      scales:{
-        x:{
-          ticks:{
-            font:{size:9},
-            callback: function(val,idx){ return weekLabels[idx]?.split('\n') || '' }
-          },
-          grid:{display:false}
-        },
-        y1:{position:'left',min:0,max:110,ticks:{font:{size:9},callback:v=>v+'%'},grid:{color:'#ece8e3'},title:{display:true,text:'SE %',font:{size:9}}},
-        y2:{position:'right',min:0,max:14,ticks:{font:{size:9},callback:v=>v+'hr'},grid:{display:false},title:{display:true,text:'hr',font:{size:9}}},
-        y3:{display:false,min:0,max:2}
-      }
+    scales:{
+      x:{ticks:{font:{size:9},callback:function(_,i,vals){ const l=this.chart.data.labels[i]; return l?.split('\n')||l }},grid:{display:false}},
+      y1:{position:'left',min:0,max:110,ticks:{font:{size:9},callback:v=>v+'%'},grid:{color:'#ece8e3'},title:{display:true,text:'SE %',font:{size:9}}},
+      y2:{position:'right',min:0,max:14,ticks:{font:{size:9},callback:v=>v+'hr'},grid:{display:false},title:{display:true,text:'hr',font:{size:9}}},
+      y3:{display:false,min:0,max:2}
     }
+  }
+
+  // 初始建立圖表（預設本週每日）
+  histChart = new Chart(document.getElementById('c-hist'),{
+    type:'line',
+    data:{ labels:dayLabels, datasets:chartDatasets(daySE,dayTST,dayTIB,daySOL,dayWASO) },
+    options: chartOptions
   })
+
+  // 切換模式函數（暴露到 window 供按鈕呼叫）
+  window.switchHistMode = function(mode) {
+    histMode = mode
+    const isWeek = mode === 'week'
+    histChart.data.labels   = isWeek ? dayLabels   : weekLabels
+    histChart.data.datasets = isWeek
+      ? chartDatasets(daySE,dayTST,dayTIB,daySOL,dayWASO)
+      : chartDatasets(wSE,wTST,wTIB,wSOL,wWASO)
+    histChart.update()
+
+    // 更新按鈕樣式
+    const bw = document.getElementById('hist-btn-week')
+    const ba = document.getElementById('hist-btn-all')
+    if(bw && ba){
+      bw.style.background   = isWeek ? 'var(--brand)' : 'transparent'
+      bw.style.color        = isWeek ? '#fff'         : 'var(--mut)'
+      bw.style.borderColor  = isWeek ? 'var(--brand)' : 'var(--bdr)'
+      ba.style.background   = isWeek ? 'transparent'  : 'var(--brand)'
+      ba.style.color        = isWeek ? 'var(--mut)'   : '#fff'
+      ba.style.borderColor  = isWeek ? 'var(--bdr)'   : 'var(--brand)'
+    }
+    const lbl = document.getElementById('hist-mode-label')
+    if(lbl) lbl.textContent = isWeek ? '本週每日' : '整段週平均'
+  }
 
   isr.style.display='block'
   isr.scrollIntoView({behavior:'smooth',block:'start'})
@@ -1016,7 +1050,7 @@ async function deleteLog(id, name, date) {
   if (error) { alert('刪除失敗：' + error.message); return }
   await loadData()
 }
-// ── PNG 匯出（A4 尺寸 2480×3508px，300 DPI）──
+// ── PNG 匯出（A4 寬度 2480px，高度依內容自適應）──
 async function exportPNG() {
   const el  = document.getElementById('isr')
   const btn = document.getElementById('export-png-btn')
@@ -1029,14 +1063,10 @@ async function exportPNG() {
   await new Promise(r => setTimeout(r, 150))
 
   try {
-    // A4 @ 300dpi = 2480 × 3508 px
-    const A4_W = 2480
-    const A4_H = 3508
-
-    // scale 讓截圖寬度對齊 A4 寬度
+    const A4_W  = 2480                      // A4 寬度 @ 300dpi
     const srcW  = el.scrollWidth
     const srcH  = el.scrollHeight
-    const scale = A4_W / srcW
+    const scale = A4_W / srcW               // 依內容寬度縮放
 
     const rawCanvas = await html2canvas(el, {
       scale          : scale,
@@ -1048,24 +1078,25 @@ async function exportPNG() {
       windowWidth    : srcW,
     })
 
-    // 建立固定 A4 尺寸的 canvas（高度不足留白，超出裁切）
-    const a4Canvas  = document.createElement('canvas')
-    a4Canvas.width  = A4_W
-    a4Canvas.height = A4_H
-    const ctx = a4Canvas.getContext('2d')
+    // canvas 尺寸 = 實際截圖尺寸（寬 A4，高依內容）
+    // 不強制 A4 高度，避免大量空白
+    const finalCanvas  = document.createElement('canvas')
+    finalCanvas.width  = rawCanvas.width
+    finalCanvas.height = rawCanvas.height
+    const ctx = finalCanvas.getContext('2d')
     ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, A4_W, A4_H)
-    ctx.drawImage(rawCanvas, 0, 0)   // 置頂貼入
+    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height)
+    ctx.drawImage(rawCanvas, 0, 0)
 
     // 組合檔名
     const name = document.getElementById('rpt-name-badge').textContent
                   .replace(/[【】\s]/g,'') || '睡眠報告'
     const dateRange = document.getElementById('rpt-info-bar')
                       .querySelector('.iv')?.textContent?.replace(/\s/g,'') || ''
-    const filename = `熊愛睏_${name}_${dateRange}_A4.png`
+    const filename = `熊愛睏_${name}_${dateRange}.png`
 
     const a = document.createElement('a')
-    a.href     = a4Canvas.toDataURL('image/png')
+    a.href     = finalCanvas.toDataURL('image/png')
     a.download = filename
     a.click()
 
