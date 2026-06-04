@@ -409,8 +409,18 @@ tr:hover td{background:rgba(30,77,102,.03)}
         <h3>產生 7 日睡眠報告</h3>
         <div class="rfr">
           <div class="rff"><label>填寫者名字</label><input type="text" id="rn" placeholder="輸入名字" style="min-width:160px"></div>
-          <div class="rff"><label>結束日期（往前最多28天）</label><input type="date" id="re"></div>
+          <div class="rff">
+            <label>起始日期（第1天）</label>
+            <input type="date" id="rs">
+          </div>
+          <div class="rff">
+            <label>結束日期（第7天）</label>
+            <input type="date" id="re">
+          </div>
           <button class="gbtn" onclick="genReport()">產生報告</button>
+        </div>
+        <div style="font-size:11px;color:var(--hnt);margin-top:8px">
+          💡 選擇起始與結束日期，系統只抓這段區間內的資料，避免誤抓其他週數據
         </div>
       </div>
 
@@ -418,7 +428,7 @@ tr:hover td{background:rgba(30,77,102,.03)}
         <div class="rpt-header">
           <div>
             <div class="rpt-logo"><span class="rpt-logo-emoji">🐻</span> 熊愛睏 <span style="font-size:13px;opacity:.7;font-weight:400">睡眠報告</span></div>
-            <div class="rpt-logo-sub">InSleep </div>
+            <div class="rpt-logo-sub">InSleep · 睡眠行為科學分析</div>
           </div>
           <div id="rpt-name-badge" class="rpt-name-badge"></div>
           <button class="rpt-print-btn" id="export-png-btn" onclick="exportPNG()">📥 儲存 PNG</button>
@@ -729,13 +739,22 @@ function buildGantt(logs) {
 // 報告生成
 // ════════════════════════════════
 async function genReport(){
-  const name=document.getElementById('rn').value.trim()
-  const endStr=document.getElementById('re').value
-  if(!name||!endStr){alert('請填寫名字與結束日期');return}
-  const endD=new Date(endStr),startD=new Date(endD);startD.setDate(startD.getDate()-27)
-  const startStr=startD.toISOString().slice(0,10)
+  const name    = document.getElementById('rn').value.trim()
+  const startStr = document.getElementById('rs').value  // 起始日期（使用者指定）
+  const endStr  = document.getElementById('re').value   // 結束日期（使用者指定）
 
-  const{data,error}=await db.from('sleep_logs').select('*').eq('name',name).gte('date',startStr).lte('date',endStr).order('date',{ascending:true})
+  if(!name)            { alert('請填寫名字'); return }
+  if(!startStr||!endStr){ alert('請選擇起始與結束日期'); return }
+  if(startStr > endStr) { alert('起始日期不能晚於結束日期'); return }
+
+  // 查詢嚴格依使用者指定的日期區間，不自動推算，避免抓到其他週
+  const{data,error}=await db.from('sleep_logs')
+    .select('*')
+    .eq('name',name)
+    .gte('date',startStr)   // >= 起始日期
+    .lte('date',endStr)     // <= 結束日期
+    .order('date',{ascending:true})
+
   document.getElementById('norpt').style.display='none'
   const isr=document.getElementById('isr')
 
@@ -746,18 +765,22 @@ async function genReport(){
   if(histChart){histChart.destroy();histChart=null}
 
   const logs=data
-  const seArr=logs.map(getSE).filter(v=>v!=null)
   const tstArr=logs.map(getTST_N).filter(v=>v!=null)
   const tibArr=logs.map(getTIB).filter(v=>v!=null)
   const solArr=logs.map(getSOL).filter(v=>v!=null)
   const wasoArr=logs.map(wasoM)
   const napArr=logs.map(l=>l.naps?napTotal(l.naps):0)
 
-  const avgSE=avg(seArr)
   const avgTST=avg(tstArr)
   const avgTIB=avg(tibArr)
   const avgSOL=avg(solArr)
   const avgWASO=avg(wasoArr)
+
+  // ── SE 正確公式：先算 TST 平均、TIB 平均，再相除 ──
+  // 防呆：不能先算每天 SE 再平均，必須用平均TST / 平均TIB
+  const avgSE = (avgTST != null && avgTIB != null && avgTIB > 0)
+    ? Math.min(Math.round(avgTST / avgTIB * 100), 100)
+    : null
 
   document.getElementById('rpt-name-badge').textContent=`【${name}】`
   document.getElementById('rpt-info-bar').innerHTML=`
@@ -796,10 +819,15 @@ async function genReport(){
 
   function scClass(v,g,w){return v!=null?(v>=g?'ok':v>=w?'mid':'lo'):''}
   const wdLogs=logs.filter(l=>!isHol(l.date)),hdLogs=logs.filter(l=>isHol(l.date))
-  const avgSE_WD=avg(wdLogs.map(getSE).filter(v=>v!=null))
-  const avgSE_HD=avg(hdLogs.map(getSE).filter(v=>v!=null))
+
+  // SE 平日/假日：同樣用 avgTST/avgTIB 方式，不先算每天再平均
   const avgTST_WD=avg(wdLogs.map(getTST_N).filter(v=>v!=null))
+  const avgTIB_WD=avg(wdLogs.map(getTIB).filter(v=>v!=null))
   const avgTST_HD=avg(hdLogs.map(getTST_N).filter(v=>v!=null))
+  const avgTIB_HD=avg(hdLogs.map(getTIB).filter(v=>v!=null))
+  const avgSE_WD = (avgTST_WD!=null&&avgTIB_WD&&avgTIB_WD>0) ? Math.min(Math.round(avgTST_WD/avgTIB_WD*100),100) : null
+  const avgSE_HD = (avgTST_HD!=null&&avgTIB_HD&&avgTIB_HD>0) ? Math.min(Math.round(avgTST_HD/avgTIB_HD*100),100) : null
+
   const avgSOL_WD=avg(wdLogs.map(getSOL).filter(v=>v!=null))
   const avgSOL_HD=avg(hdLogs.map(getSOL).filter(v=>v!=null))
   const avgWASO_WD=avg(wdLogs.map(wasoM))
@@ -988,43 +1016,61 @@ async function deleteLog(id, name, date) {
   if (error) { alert('刪除失敗：' + error.message); return }
   await loadData()
 }
+// ── PNG 匯出（A4 尺寸 2480×3508px，300 DPI）──
 async function exportPNG() {
-  const el = document.getElementById('isr')
+  const el  = document.getElementById('isr')
   const btn = document.getElementById('export-png-btn')
 
   btn.textContent = '截圖中...'
   btn.disabled = true
 
-  // 套用匯出模式（隱藏按鈕、固定兩欄）
+  // 套用匯出模式（隱藏按鈕、強制兩欄排版）
   el.classList.add('png-export-mode')
-
-  // 等待渲染完成
-  await new Promise(r => setTimeout(r, 120))
+  await new Promise(r => setTimeout(r, 150))
 
   try {
-    const canvas = await html2canvas(el, {
-      scale: 2,               // 2x 解析度，輸出清晰
-      useCORS: true,
+    // A4 @ 300dpi = 2480 × 3508 px
+    const A4_W = 2480
+    const A4_H = 3508
+
+    // scale 讓截圖寬度對齊 A4 寬度
+    const srcW  = el.scrollWidth
+    const srcH  = el.scrollHeight
+    const scale = A4_W / srcW
+
+    const rawCanvas = await html2canvas(el, {
+      scale          : scale,
+      useCORS        : true,
       backgroundColor: '#ffffff',
-      logging: false,
-      width: el.scrollWidth,
-      height: el.scrollHeight,
-      windowWidth: el.scrollWidth,
+      logging        : false,
+      width          : srcW,
+      height         : srcH,
+      windowWidth    : srcW,
     })
 
-    // 下載
+    // 建立固定 A4 尺寸的 canvas（高度不足留白，超出裁切）
+    const a4Canvas  = document.createElement('canvas')
+    a4Canvas.width  = A4_W
+    a4Canvas.height = A4_H
+    const ctx = a4Canvas.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, A4_W, A4_H)
+    ctx.drawImage(rawCanvas, 0, 0)   // 置頂貼入
+
+    // 組合檔名
     const name = document.getElementById('rpt-name-badge').textContent
-                  .replace(/[【】\s]/g, '') || '睡眠報告'
+                  .replace(/[【】\s]/g,'') || '睡眠報告'
     const dateRange = document.getElementById('rpt-info-bar')
                       .querySelector('.iv')?.textContent?.replace(/\s/g,'') || ''
-    const filename = `熊愛睏_${name}_${dateRange}.png`
+    const filename = `熊愛睏_${name}_${dateRange}_A4.png`
 
     const a = document.createElement('a')
-    a.href = canvas.toDataURL('image/png')
+    a.href     = a4Canvas.toDataURL('image/png')
     a.download = filename
     a.click()
-  } catch (e) {
-    alert('截圖失敗，請確認瀏覽器允許此操作：' + e.message)
+
+  } catch(e) {
+    alert('截圖失敗：' + e.message)
   }
 
   el.classList.remove('png-export-mode')
