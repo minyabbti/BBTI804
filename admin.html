@@ -461,7 +461,7 @@ tr:hover td{background:rgba(30,77,102,.03)}
               <div class="score-name">熊愛睏評分</div>
               <div class="score-big" id="rpt-score">—</div>
               <div class="score-unit">/ 100 分</div>
-              <div class="score-desc">睡眠效率 SE</div>
+              <div class="score-desc">整週睡眠效率 SE<br>= 平均 TST ÷ 平均 TIB × 100%</div>
             </div>
             <div class="stats-box"><h4>本週數據</h4><div id="rpt-stats"></div></div>
             <div class="other-box"><h4>其他記錄分析</h4><div id="rpt-other"></div></div>
@@ -798,10 +798,17 @@ async function genReport(){
   const avgSOL=avg(solArr)
   const avgWASO=avg(wasoArr)
 
-  // ── SE 正確公式：先算 TST 平均、TIB 平均，再相除 ──
-  // 防呆：不能先算每天 SE 再平均，必須用平均TST / 平均TIB
-  const avgSE = (avgTST != null && avgTIB != null && avgTIB > 0)
-    ? Math.min(Math.round(avgTST / avgTIB * 100), 100)
+  // ── SE 正確公式：avg(TST) / avg(TIB) × 100 ──
+  // 只納入 TST 和 TIB 都有效的天（排除 bed_time=up_time 或時間異常的資料）
+  // 有效條件：TIB > 0 且 TST >= 0 且 TIB >= TST
+  const validPairs = logs
+    .map(l => ({ tst: getTST_N(l), tib: getTIB(l) }))
+    .filter(p => p.tst != null && p.tib != null && p.tib > 0 && p.tib >= p.tst)
+
+  const avgTST_valid = avg(validPairs.map(p => p.tst))
+  const avgTIB_valid = avg(validPairs.map(p => p.tib))
+  const avgSE = (avgTST_valid != null && avgTIB_valid != null && avgTIB_valid > 0)
+    ? Math.min(Math.round(avgTST_valid / avgTIB_valid * 100), 100)
     : null
 
   document.getElementById('rpt-name-badge').textContent=`【${name}】`
@@ -838,16 +845,18 @@ async function genReport(){
     abar('睡眠潛伏時間','SOL',avgSOL,1.2,'#d9964a',58)+
     abar('睡眠開始後清醒時間','WASO',avgWASO,1.2,'#c25a53',8)
 
-  document.getElementById('rpt-score').textContent=avgSE!=null?avgSE.toFixed(1):'—'
+  document.getElementById('rpt-score').textContent=avgSE!=null?avgSE.toFixed(0):'—'
 
   function scClass(v,g,w){return v!=null?(v>=g?'ok':v>=w?'mid':'lo'):''}
   const wdLogs=logs.filter(l=>!isHol(l.date)),hdLogs=logs.filter(l=>isHol(l.date))
 
-  // SE 平日/假日：同樣用 avgTST/avgTIB 方式，不先算每天再平均
-  const avgTST_WD=avg(wdLogs.map(getTST_N).filter(v=>v!=null))
-  const avgTIB_WD=avg(wdLogs.map(getTIB).filter(v=>v!=null))
-  const avgTST_HD=avg(hdLogs.map(getTST_N).filter(v=>v!=null))
-  const avgTIB_HD=avg(hdLogs.map(getTIB).filter(v=>v!=null))
+  // SE 平日/假日：同樣只用有效配對
+  const wdPairs = wdLogs.map(l=>({tst:getTST_N(l),tib:getTIB(l)})).filter(p=>p.tst!=null&&p.tib!=null&&p.tib>0&&p.tib>=p.tst)
+  const hdPairs = hdLogs.map(l=>({tst:getTST_N(l),tib:getTIB(l)})).filter(p=>p.tst!=null&&p.tib!=null&&p.tib>0&&p.tib>=p.tst)
+  const avgTST_WD = avg(wdPairs.map(p=>p.tst))
+  const avgTIB_WD = avg(wdPairs.map(p=>p.tib))
+  const avgTST_HD = avg(hdPairs.map(p=>p.tst))
+  const avgTIB_HD = avg(hdPairs.map(p=>p.tib))
   const avgSE_WD = (avgTST_WD!=null&&avgTIB_WD&&avgTIB_WD>0) ? Math.min(Math.round(avgTST_WD/avgTIB_WD*100),100) : null
   const avgSE_HD = (avgTST_HD!=null&&avgTIB_HD&&avgTIB_HD>0) ? Math.min(Math.round(avgTST_HD/avgTIB_HD*100),100) : null
 
