@@ -1149,7 +1149,7 @@ async function exportPNG() {
   pdfBtn.disabled = false
 }
 
-// ── PDF 匯出（A4 滿版，jsPDF 嵌圖）──
+// ── PDF 匯出（A4 滿版 300dpi，jsPDF 嵌圖）──
 async function exportPDF() {
   const btn    = document.getElementById('export-pdf-btn')
   const pngBtn = document.getElementById('export-png-btn')
@@ -1160,34 +1160,58 @@ async function exportPDF() {
   await setExportMode(true)
 
   try {
-    // A4 @ 150dpi 截圖（兼顧清晰度與檔案大小）
-    const PDF_W_PX = 1240   // A4 寬度 @ 150dpi（210mm × 150dpi/25.4）
+    // 300dpi：A4 寬 = 210mm，1mm = 300/25.4 ≈ 11.81px → 2480px
+    const PDF_W_PX = 2480
     const canvas   = await captureReport(PDF_W_PX)
 
-    // jsPDF：A4 直式，單位 mm
     const { jsPDF } = window.jspdf
-    const pdf  = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' })
+    const pdf = new jsPDF({
+      orientation : 'portrait',
+      unit        : 'mm',
+      format      : 'a4',
+      compress    : false,   // 不壓縮，保留最高畫質
+    })
 
-    const A4_W_MM = 210
-    const A4_H_MM = 297
+    const A4_W = 210   // mm
+    const A4_H = 297   // mm
 
-    // 計算圖片在 A4 上的尺寸（滿寬，高度等比）
-    const imgW_MM  = A4_W_MM
-    const imgH_MM  = canvas.height / canvas.width * A4_W_MM
+    // 圖片實際高度換算成 mm（等比例）
+    const imgH_MM = canvas.height / canvas.width * A4_W
 
-    const imgData  = canvas.toDataURL('image/jpeg', 0.92)  // JPEG 減少 PDF 體積
+    // 改用 PNG 無損格式嵌入
+    const imgData = canvas.toDataURL('image/png')
 
-    if (imgH_MM <= A4_H_MM) {
-      // 內容不超過一頁：直接置頂嵌入，填滿寬度
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgW_MM, imgH_MM)
+    if (imgH_MM <= A4_H) {
+      // 單頁：從座標 (0,0) 滿版嵌入，不留任何白邊
+      pdf.addImage(imgData, 'PNG', 0, 0, A4_W, imgH_MM)
     } else {
-      // 內容超過一頁：分頁嵌入
-      let yOffset = 0
-      while (yOffset < imgH_MM) {
-        if (yOffset > 0) pdf.addPage()
-        // 在此頁要顯示的 Y 起點（負數表示往上偏移）
-        pdf.addImage(imgData, 'JPEG', 0, -yOffset, imgW_MM, imgH_MM)
-        yOffset += A4_H_MM
+      // 多頁：每頁裁切對應高度的圖片區段分別嵌入
+      // 計算每頁對應的像素高度
+      const pageH_PX = Math.round(A4_H / imgH_MM * canvas.height)
+      let pageStart = 0
+      let pageCount = 0
+
+      while (pageStart < canvas.height) {
+        if (pageCount > 0) pdf.addPage()
+
+        // 裁切這一頁的區段到臨時 canvas
+        const pageCanvas = document.createElement('canvas')
+        pageCanvas.width  = canvas.width
+        pageCanvas.height = Math.min(pageH_PX, canvas.height - pageStart)
+        const ctx = pageCanvas.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+        ctx.drawImage(canvas, 0, -pageStart)
+
+        const pageImgH_MM = pageCanvas.height / pageCanvas.width * A4_W
+        pdf.addImage(
+          pageCanvas.toDataURL('image/png'), 'PNG',
+          0, 0,                      // 從 (0,0) 開始，無白邊
+          A4_W, pageImgH_MM          // 滿版寬度，高度等比
+        )
+
+        pageStart += pageH_PX
+        pageCount++
       }
     }
 
