@@ -8,6 +8,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -322,11 +324,13 @@ tr:hover td{background:rgba(30,77,102,.03)}
 .modal-btns button{flex:1}
 .edit-badge{font-size:10px;background:#e3edf7;color:#1a5599;padding:2px 7px;border-radius:10px;margin-left:6px;font-weight:600}
 
-/* PNG 模式 */
-.png-export-mode .rpt-print-btn{display:none!important}
-.png-export-mode{border-radius:0!important;border:none!important}
-.png-export-mode .rpt-body{grid-template-columns:1fr 268px!important}
-.png-export-mode .rpt-left{border-right:1px solid var(--bdr)!important;border-bottom:none!important}
+/* PNG / PDF 匯出模式 */
+.png-export-mode .rpt-print-btn,
+.png-export-mode #export-png-btn,
+.png-export-mode #export-pdf-btn { display: none !important; }
+.png-export-mode { border-radius: 0 !important; border: none !important; }
+.png-export-mode .rpt-body { grid-template-columns: 1fr 268px !important; }
+.png-export-mode .rpt-left { border-right: 1px solid var(--bdr) !important; border-bottom: none !important; }
 
 @media(max-width:900px){.rpt-body{grid-template-columns:1fr}.rpt-left{border-right:none;border-bottom:1px solid var(--bdr)}.sg{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.topbar,.dbnav{padding:0 1rem}.dp{padding:1.25rem 1rem}.sg{grid-template-columns:1fr 1fr}}
@@ -431,7 +435,10 @@ tr:hover td{background:rgba(30,77,102,.03)}
             <div class="rpt-logo-sub">InSleep · 睡眠行為科學分析</div>
           </div>
           <div id="rpt-name-badge" class="rpt-name-badge"></div>
-          <button class="rpt-print-btn" id="export-png-btn" onclick="exportPNG()">📥 儲存 PNG</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="rpt-print-btn" id="export-png-btn" onclick="exportPNG()">📱 儲存 PNG</button>
+            <button class="rpt-print-btn" id="export-pdf-btn" onclick="exportPDF()">📄 儲存 PDF</button>
+          </div>
         </div>
         <div class="rpt-info-bar" id="rpt-info-bar"></div>
         <div class="rpt-body">
@@ -1076,63 +1083,124 @@ async function deleteLog(id, name, date) {
   if (error) { alert('刪除失敗：' + error.message); return }
   await loadData()
 }
-// ── PNG 匯出（A4 寬度 2480px，高度依內容自適應）──
-async function exportPNG() {
-  const el  = document.getElementById('isr')
-  const btn = document.getElementById('export-png-btn')
+// ── 共用：截圖輔助函數 ──
+async function captureReport(targetWidth) {
+  const el   = document.getElementById('isr')
+  const srcW = el.scrollWidth
+  const srcH = el.scrollHeight
+  const scale = targetWidth / srcW   // 縮放至目標寬度
 
+  const canvas = await html2canvas(el, {
+    scale          : scale,
+    useCORS        : true,
+    backgroundColor: '#ffffff',
+    logging        : false,
+    width          : srcW,
+    height         : srcH,
+    windowWidth    : srcW,
+  })
+  return canvas
+}
+
+function getExportFilename(ext) {
+  const name = document.getElementById('rpt-name-badge').textContent
+                .replace(/[【】\s]/g,'') || '睡眠報告'
+  const dateRange = document.getElementById('rpt-info-bar')
+                    .querySelector('.iv')?.textContent?.replace(/\s/g,'') || ''
+  return `熊愛睏_${name}_${dateRange}.${ext}`
+}
+
+async function setExportMode(on) {
+  const el = document.getElementById('isr')
+  if (on) {
+    el.classList.add('png-export-mode')
+    await new Promise(r => setTimeout(r, 150))  // 等待重排
+  } else {
+    el.classList.remove('png-export-mode')
+  }
+}
+
+// ── PNG 匯出（1080px 寬，LINE 標準）──
+async function exportPNG() {
+  const btn = document.getElementById('export-png-btn')
+  const pdfBtn = document.getElementById('export-pdf-btn')
   btn.textContent = '截圖中...'
   btn.disabled = true
+  pdfBtn.disabled = true
 
-  // 套用匯出模式（隱藏按鈕、強制兩欄排版）
-  el.classList.add('png-export-mode')
-  await new Promise(r => setTimeout(r, 150))
+  await setExportMode(true)
 
   try {
-    const A4_W  = 2480                      // A4 寬度 @ 300dpi
-    const srcW  = el.scrollWidth
-    const srcH  = el.scrollHeight
-    const scale = A4_W / srcW               // 依內容寬度縮放
-
-    const rawCanvas = await html2canvas(el, {
-      scale          : scale,
-      useCORS        : true,
-      backgroundColor: '#ffffff',
-      logging        : false,
-      width          : srcW,
-      height         : srcH,
-      windowWidth    : srcW,
-    })
-
-    // canvas 尺寸 = 實際截圖尺寸（寬 A4，高依內容）
-    // 不強制 A4 高度，避免大量空白
-    const finalCanvas  = document.createElement('canvas')
-    finalCanvas.width  = rawCanvas.width
-    finalCanvas.height = rawCanvas.height
-    const ctx = finalCanvas.getContext('2d')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height)
-    ctx.drawImage(rawCanvas, 0, 0)
-
-    // 組合檔名
-    const name = document.getElementById('rpt-name-badge').textContent
-                  .replace(/[【】\s]/g,'') || '睡眠報告'
-    const dateRange = document.getElementById('rpt-info-bar')
-                      .querySelector('.iv')?.textContent?.replace(/\s/g,'') || ''
-    const filename = `熊愛睏_${name}_${dateRange}.png`
+    const LINE_W = 1080   // LINE 訊息標準寬度
+    const canvas = await captureReport(LINE_W)
 
     const a = document.createElement('a')
-    a.href     = finalCanvas.toDataURL('image/png')
-    a.download = filename
+    a.href     = canvas.toDataURL('image/png')
+    a.download = getExportFilename('png')
     a.click()
 
   } catch(e) {
-    alert('截圖失敗：' + e.message)
+    alert('PNG 截圖失敗：' + e.message)
   }
 
-  el.classList.remove('png-export-mode')
-  btn.textContent = '📥 儲存 PNG'
+  await setExportMode(false)
+  btn.textContent = '📱 儲存 PNG'
   btn.disabled = false
+  pdfBtn.disabled = false
+}
+
+// ── PDF 匯出（A4 滿版，jsPDF 嵌圖）──
+async function exportPDF() {
+  const btn    = document.getElementById('export-pdf-btn')
+  const pngBtn = document.getElementById('export-png-btn')
+  btn.textContent = 'PDF 生成中...'
+  btn.disabled = true
+  pngBtn.disabled = true
+
+  await setExportMode(true)
+
+  try {
+    // A4 @ 150dpi 截圖（兼顧清晰度與檔案大小）
+    const PDF_W_PX = 1240   // A4 寬度 @ 150dpi（210mm × 150dpi/25.4）
+    const canvas   = await captureReport(PDF_W_PX)
+
+    // jsPDF：A4 直式，單位 mm
+    const { jsPDF } = window.jspdf
+    const pdf  = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' })
+
+    const A4_W_MM = 210
+    const A4_H_MM = 297
+
+    // 計算圖片在 A4 上的尺寸（滿寬，高度等比）
+    const imgW_MM  = A4_W_MM
+    const imgH_MM  = canvas.height / canvas.width * A4_W_MM
+
+    const imgData  = canvas.toDataURL('image/jpeg', 0.92)  // JPEG 減少 PDF 體積
+
+    if (imgH_MM <= A4_H_MM) {
+      // 內容不超過一頁：直接置頂嵌入，填滿寬度
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgW_MM, imgH_MM)
+    } else {
+      // 內容超過一頁：分頁嵌入
+      let yOffset = 0
+      while (yOffset < imgH_MM) {
+        if (yOffset > 0) pdf.addPage()
+        // 在此頁要顯示的 Y 起點（負數表示往上偏移）
+        pdf.addImage(imgData, 'JPEG', 0, -yOffset, imgW_MM, imgH_MM)
+        yOffset += A4_H_MM
+      }
+    }
+
+    pdf.save(getExportFilename('pdf'))
+
+  } catch(e) {
+    alert('PDF 生成失敗：' + e.message)
+  }
+
+  await setExportMode(false)
+  btn.textContent = '📄 儲存 PDF'
+  btn.disabled = false
+  pngBtn.disabled = false
 }
 </script>
 </body>
