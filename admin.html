@@ -324,12 +324,19 @@ tr:hover td{background:rgba(30,77,102,.03)}
 .modal-btns button{flex:1}
 .edit-badge{font-size:10px;background:#e3edf7;color:#1a5599;padding:2px 7px;border-radius:10px;margin-left:6px;font-weight:600}
 
-/* PNG / PDF 匯出模式 */
+/* PNG / PDF 匯出模式：鎖定寬度確保比例正確 */
 .png-export-mode .rpt-print-btn,
 .png-export-mode #export-png-btn,
 .png-export-mode #export-pdf-btn { display: none !important; }
-.png-export-mode { border-radius: 0 !important; border: none !important; }
-.png-export-mode .rpt-body { grid-template-columns: 1fr 268px !important; }
+.png-export-mode {
+  border-radius: 0 !important;
+  border: none !important;
+  width: 960px !important;        /* 鎖定報告寬度，確保截圖比例一致 */
+  min-width: 960px !important;
+  max-width: 960px !important;
+  overflow: visible !important;
+}
+.png-export-mode .rpt-body { grid-template-columns: 1fr 240px !important; }
 .png-export-mode .rpt-left { border-right: 1px solid var(--bdr) !important; border-bottom: none !important; }
 
 @media(max-width:900px){.rpt-body{grid-template-columns:1fr}.rpt-left{border-right:none;border-bottom:1px solid var(--bdr)}.sg{grid-template-columns:repeat(2,1fr)}}
@@ -1149,7 +1156,7 @@ async function exportPNG() {
   pdfBtn.disabled = false
 }
 
-// ── PDF 匯出（A4 滿版 300dpi，jsPDF 嵌圖）──
+// ── PDF 匯出（A5，jsPDF 嵌圖，300dpi）──
 async function exportPDF() {
   const btn    = document.getElementById('export-pdf-btn')
   const pngBtn = document.getElementById('export-png-btn')
@@ -1160,41 +1167,53 @@ async function exportPDF() {
   await setExportMode(true)
 
   try {
-    // 300dpi：A4 寬 = 210mm，1mm = 300/25.4 ≈ 11.81px → 2480px
-    const PDF_W_PX = 2480
-    const canvas   = await captureReport(PDF_W_PX)
+    // A5 @ 300dpi：148mm × (300/25.4) ≈ 1748px 寬
+    // 報告鎖定 960px，scale = 1748/960 ≈ 1.82
+    const A5_W_PX  = 1748
+    const LOCK_W   = 960     // 對應 png-export-mode 鎖定的寬度
 
+    const el   = document.getElementById('isr')
+    const srcH = el.scrollHeight
+    const scale = A5_W_PX / LOCK_W
+
+    const canvas = await html2canvas(el, {
+      scale          : scale,
+      useCORS        : true,
+      backgroundColor: '#ffffff',
+      logging        : false,
+      width          : LOCK_W,   // 使用鎖定寬度，確保比例一致
+      height         : srcH,
+      windowWidth    : LOCK_W,
+    })
+
+    // jsPDF A5 直式
     const { jsPDF } = window.jspdf
     const pdf = new jsPDF({
       orientation : 'portrait',
       unit        : 'mm',
-      format      : 'a4',
-      compress    : false,   // 不壓縮，保留最高畫質
+      format      : 'a5',       // A5：148mm × 210mm
+      compress    : false,
     })
 
-    const A4_W = 210   // mm
-    const A4_H = 297   // mm
+    const A5_W_MM = 148
+    const A5_H_MM = 210
 
-    // 圖片實際高度換算成 mm（等比例）
-    const imgH_MM = canvas.height / canvas.width * A4_W
+    // 圖片高度等比換算成 mm
+    const imgH_MM = canvas.height / canvas.width * A5_W_MM
 
-    // 改用 PNG 無損格式嵌入
     const imgData = canvas.toDataURL('image/png')
 
-    if (imgH_MM <= A4_H) {
-      // 單頁：從座標 (0,0) 滿版嵌入，不留任何白邊
-      pdf.addImage(imgData, 'PNG', 0, 0, A4_W, imgH_MM)
+    if (imgH_MM <= A5_H_MM) {
+      // 單頁：(0,0) 起點，滿版寬度，無白邊
+      pdf.addImage(imgData, 'PNG', 0, 0, A5_W_MM, imgH_MM)
     } else {
-      // 多頁：每頁裁切對應高度的圖片區段分別嵌入
-      // 計算每頁對應的像素高度
-      const pageH_PX = Math.round(A4_H / imgH_MM * canvas.height)
-      let pageStart = 0
-      let pageCount = 0
+      // 多頁：每頁裁切對應高度的區段
+      const pageH_PX = Math.round(A5_H_MM / imgH_MM * canvas.height)
+      let pageStart = 0, pageCount = 0
 
       while (pageStart < canvas.height) {
         if (pageCount > 0) pdf.addPage()
 
-        // 裁切這一頁的區段到臨時 canvas
         const pageCanvas = document.createElement('canvas')
         pageCanvas.width  = canvas.width
         pageCanvas.height = Math.min(pageH_PX, canvas.height - pageStart)
@@ -1203,12 +1222,8 @@ async function exportPDF() {
         ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
         ctx.drawImage(canvas, 0, -pageStart)
 
-        const pageImgH_MM = pageCanvas.height / pageCanvas.width * A4_W
-        pdf.addImage(
-          pageCanvas.toDataURL('image/png'), 'PNG',
-          0, 0,                      // 從 (0,0) 開始，無白邊
-          A4_W, pageImgH_MM          // 滿版寬度，高度等比
-        )
+        const pageImgH_MM = pageCanvas.height / pageCanvas.width * A5_W_MM
+        pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, A5_W_MM, pageImgH_MM)
 
         pageStart += pageH_PX
         pageCount++
